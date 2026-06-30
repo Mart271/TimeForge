@@ -1,0 +1,843 @@
+// TimeForge — Prisma schema.
+// Phase 6: Core Organization (Department, Team, Client, Project, WorkCategory, Holiday).
+// Phase 7: Time Tracking (TimeEntry).
+// Phase 8: Smart Timesheets (Timesheet).
+// Phase 9: Daily Scrum, Supervisor Approval, KPI, Payroll Preparation.
+// Every business table carries the standard columns: tenant_id, organization_id,
+// created_by, updated_by, created_at, updated_at, deleted_at, version.
+// RLS is applied via prisma/sql/rls.sql.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────────────────────────
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum EmploymentType {
+  EMPLOYEE
+  INTERN
+  CONTRACTOR
+  PART_TIME
+  FULL_TIME
+}
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  APPROVE
+  REJECT
+  REVISION_REQUEST
+  PAYROLL_EXPORT
+  ROLE_CHANGE
+  PASSWORD_CHANGE
+  AI_USAGE
+  SETTINGS_CHANGE
+  ADMIN_ACTION
+}
+
+enum TimeEntrySource {
+  TIMER
+  MANUAL
+}
+
+enum TimesheetStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  REVISION_REQUESTED
+  PAYROLL_READY
+}
+
+// Phase 9 enums ───────────────────────────────────────────────────────────────
+
+enum ApprovalAction {
+  APPROVE
+  REJECT
+  REQUEST_REVISION
+}
+
+enum KpiMetricType {
+  COUNT
+  HOURS
+  PERCENT
+  CURRENCY
+}
+
+enum KpiPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+  PAYROLL_PERIOD
+}
+
+enum PayrollPeriodType {
+  FIRST_HALF
+  SECOND_HALF
+  CUSTOM
+}
+
+enum PayrollPeriodStatus {
+  OPEN
+  GENERATED
+  LOCKED
+  EXPORTED
+}
+
+// ─── Tenancy & Core Organization ────────────────────────────────────────────
+
+model Tenant {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String   @unique
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  organizations Organization[]
+
+  @@map("tenants")
+}
+
+model Organization {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  name      String
+  slug      String
+  timezone  String    @default("UTC")
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+  version   Int       @default(0)
+
+  tenant         Tenant                @relation(fields: [tenantId], references: [id])
+  settings       OrganizationSetting[]
+  users          User[]
+  departments    Department[]
+  teams          Team[]
+  clients        Client[]
+  projects       Project[]
+  workCategories WorkCategory[]
+  holidays       Holiday[]
+  timeEntries    TimeEntry[]
+  timesheets     Timesheet[]
+  scrumEntries   ScrumEntry[]
+  kpiTemplates   KpiTemplate[]
+  payrollPeriods PayrollPeriod[]
+
+  @@unique([tenantId, slug])
+  @@unique([tenantId, id])
+  @@index([tenantId])
+  @@map("organizations")
+}
+
+model OrganizationSetting {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  key            String
+  value          Json
+  type           String    @default("json")
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  version        Int       @default(0)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([tenantId, organizationId, key])
+  @@index([tenantId, organizationId])
+  @@map("organization_settings")
+}
+
+// ─── Users & RBAC ────────────────────────────────────────────────────────────
+
+model User {
+  id              String         @id @default(uuid()) @db.Uuid
+  tenantId        String         @map("tenant_id") @db.Uuid
+  organizationId  String         @map("organization_id") @db.Uuid
+  email           String
+  passwordHash    String?        @map("password_hash")
+  firstName       String         @map("first_name")
+  lastName        String         @map("last_name")
+  status          UserStatus     @default(INVITED)
+  employmentType  EmploymentType @default(EMPLOYEE) @map("employment_type")
+  hourlyRate      Decimal?       @map("hourly_rate") @db.Decimal(12, 2)
+  payrollEligible Boolean        @default(true) @map("payroll_eligible")
+  emailVerifiedAt DateTime?      @map("email_verified_at") @db.Timestamptz
+  supervisorId    String?        @map("supervisor_id") @db.Uuid
+  departmentId    String?        @map("department_id") @db.Uuid
+  teamId          String?        @map("team_id") @db.Uuid
+  createdBy       String?        @map("created_by") @db.Uuid
+  updatedBy       String?        @map("updated_by") @db.Uuid
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt       DateTime?      @map("deleted_at") @db.Timestamptz
+  version         Int            @default(0)
+
+  organization     Organization     @relation(fields: [tenantId, organizationId], references: [tenantId, id])
+  department       Department?      @relation(fields: [departmentId], references: [id])
+  team             Team?            @relation(fields: [teamId], references: [id])
+  roles            UserRole[]
+  refreshTokens    RefreshToken[]
+  timeEntries      TimeEntry[]
+  timesheets       Timesheet[]
+  scrumEntries     ScrumEntry[]
+  kpiProgress      KpiProgress[]
+  approvals        Approval[]       @relation("SupervisorApprovals")
+  payrollLineItems PayrollLineItem[]
+  notifications    Notification[]
+
+  @@unique([tenantId, email])
+  @@unique([tenantId, id])
+  @@index([tenantId, organizationId])
+  @@map("users")
+}
+
+model Role {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  key       String
+  name      String
+  isSystem  Boolean   @default(true) @map("is_system")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+  version   Int       @default(0)
+
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@unique([tenantId, key])
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(uuid()) @db.Uuid
+  key         String  @unique
+  description String?
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// ─── Auth sessions ───────────────────────────────────────────────────────────
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @map("token_hash")
+  familyId  String    @map("family_id") @db.Uuid
+  device    String?
+  ip        String?
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+// ─── Audit & idempotency ─────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String      @id @default(uuid()) @db.Uuid
+  tenantId   String      @map("tenant_id") @db.Uuid
+  actorId    String?     @map("actor_id") @db.Uuid
+  action     AuditAction
+  entityType String?     @map("entity_type")
+  entityId   String?     @map("entity_id") @db.Uuid
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, actorId, createdAt])
+  @@map("audit_log")
+}
+
+model IdempotencyKey {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  key       String
+  endpoint  String?
+  resultRef String?   @map("result_ref")
+  expiresAt DateTime? @map("expires_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([tenantId, key])
+  @@map("idempotency_keys")
+}
+
+// ─── Core Organization — Phase 6 ─────────────────────────────────────────────
+
+model Department {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  version        Int       @default(0)
+
+  organization Organization @relation(fields: [tenantId, organizationId], references: [tenantId, id])
+  users        User[]
+  teams        Team[]
+
+  @@unique([tenantId, organizationId, name])
+  @@index([tenantId, organizationId])
+  @@map("departments")
+}
+
+model Team {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String
+  departmentId   String?   @map("department_id") @db.Uuid
+  supervisorId   String?   @map("supervisor_id") @db.Uuid
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  version        Int       @default(0)
+
+  organization Organization @relation(fields: [tenantId, organizationId], references: [tenantId, id])
+  department   Department?  @relation(fields: [departmentId], references: [id])
+  users        User[]
+
+  @@unique([tenantId, organizationId, name])
+  @@index([tenantId, organizationId])
+  @@map("teams")
+}
+
+model Client {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String
+  contact        String?
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  version        Int       @default(0)
+
+  organization Organization @relation(fields: [tenantId, organizationId], references: [tenantId, id])
+  projects     Project[]
+  timeEntries  TimeEntry[]
+
+  @@unique([tenantId, organizationId, name])
+  @@index([tenantId, organizationId])
+  @@map("clients")
+}
+
+model Project {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String
+  code           String
+  clientId       String?   @map("client_id") @db.Uuid
+  billable       Boolean   @default(true)
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  version        Int       @default(0)
+
+  organization Organization @relation(fields: [tenantId, organizationId], references: [tenantId, id])
+  client       Client?      @relation(fields: [clientId], references: [id])
+  timeEntries  TimeEntry[]
+
+  @@unique([tenantId, organizationId, code])
+  @@index([tenantId, organizationId])
+  @@map("projects")
+}
+
+model WorkCategory {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  version        Int       @default(0)
+
+  organization Organization @relation(fields: [tenantId, organizationId], references: [tenantId, id])
+  timeEntries  TimeEntry[]
+
+  @@unique([tenantId, organizationId, name])
+  @@index([tenantId, organizationId])
+  @@map("work_categories")
+}
+
+model Holiday {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String
+  date           DateTime  @db.Date
+  recurring      Boolean   @default(false)
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  version        Int       @default(0)
+
+  organization Organization @relation(fields: [tenantId, organizationId], references: [tenantId, id])
+
+  @@unique([tenantId, organizationId, date, name])
+  @@index([tenantId, organizationId])
+  @@map("holidays")
+}
+
+// ─── Time Tracking — Phase 7 ─────────────────────────────────────────────────
+
+model TimeEntry {
+  id              String          @id @default(uuid()) @db.Uuid
+  tenantId        String          @map("tenant_id") @db.Uuid
+  organizationId  String          @map("organization_id") @db.Uuid
+  userId          String          @map("user_id") @db.Uuid
+  timesheetId     String?         @map("timesheet_id") @db.Uuid
+  projectId       String?         @map("project_id") @db.Uuid
+  clientId        String?         @map("client_id") @db.Uuid
+  workCategoryId  String?         @map("work_category_id") @db.Uuid
+  source          TimeEntrySource @default(MANUAL)
+  startTime       DateTime        @map("start_time") @db.Timestamptz
+  endTime         DateTime?       @map("end_time") @db.Timestamptz
+  durationMinutes Int?            @map("duration_minutes")
+  description     String?
+  referenceLinks  Json?           @map("reference_links")
+  createdBy       String?         @map("created_by") @db.Uuid
+  updatedBy       String?         @map("updated_by") @db.Uuid
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt       DateTime?       @map("deleted_at") @db.Timestamptz
+  version         Int             @default(0)
+
+  organization Organization  @relation(fields: [tenantId, organizationId], references: [tenantId, id])
+  user         User          @relation(fields: [userId], references: [id])
+  project      Project?      @relation(fields: [projectId], references: [id])
+  client       Client?       @relation(fields: [clientId], references: [id])
+  workCategory WorkCategory? @relation(fields: [workCategoryId], references: [id])
+  timesheet    Timesheet?    @relation(fields: [timesheetId], references: [id])
+
+  @@index([tenantId, userId, startTime])
+  @@index([tenantId, organizationId])
+  @@index([timesheetId])
+  @@map("time_entries")
+}
+
+// ─── Smart Timesheets — Phase 8 ──────────────────────────────────────────────
+
+model Timesheet {
+  id             String          @id @default(uuid()) @db.Uuid
+  tenantId       String          @map("tenant_id") @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  userId         String          @map("user_id") @db.Uuid
+  status         TimesheetStatus @default(DRAFT)
+  periodStart    DateTime        @map("period_start") @db.Date
+  periodEnd      DateTime        @map("period_end") @db.Date
+  totalMinutes   Int             @default(0) @map("total_minutes")
+  summary        String?
+  submittedAt    DateTime?       @map("submitted_at") @db.Timestamptz
+  decidedAt      DateTime?       @map("decided_at") @db.Timestamptz
+  createdBy      String?         @map("created_by") @db.Uuid
+  updatedBy      String?         @map("updated_by") @db.Uuid
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime?       @map("deleted_at") @db.Timestamptz
+  version        Int             @default(0)
+
+  organization Organization @relation(fields: [tenantId, organizationId], references: [tenantId, id])
+  user         User         @relation(fields: [userId], references: [id])
+  entries      TimeEntry[]
+  approvals    Approval[]
+
+  @@index([tenantId, userId, periodStart])
+  @@index([tenantId, status, organizationId])
+  @@map("timesheets")
+}
+
+// ─── Daily Scrum — Phase 9 ───────────────────────────────────────────────────
+
+model ScrumEntry {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  entryDate      DateTime  @map("entry_date") @db.Date
+  yesterday      String
+  today          String
+  blockers       String?
+  notes          String?
+  supervisorNote String?   @map("supervisor_note")
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  version        Int       @default(0)
+
+  organization Organization @relation(fields: [tenantId, organizationId], references: [tenantId, id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, userId, entryDate])
+  @@index([tenantId, organizationId, entryDate])
+  @@index([tenantId, userId, entryDate])
+  @@map("scrum_entries")
+}
+
+// ─── Supervisor Approval — Phase 9 ───────────────────────────────────────────
+
+model Approval {
+  id             String          @id @default(uuid()) @db.Uuid
+  tenantId       String          @map("tenant_id") @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  timesheetId    String          @map("timesheet_id") @db.Uuid
+  supervisorId   String          @map("supervisor_id") @db.Uuid
+  lastAction     ApprovalAction  @map("last_action")
+  resultingState TimesheetStatus @map("resulting_state")
+  remark         String?
+  actedAt        DateTime        @map("acted_at") @db.Timestamptz
+  createdBy      String?         @map("created_by") @db.Uuid
+  updatedBy      String?         @map("updated_by") @db.Uuid
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime?       @map("deleted_at") @db.Timestamptz
+  version        Int             @default(0)
+
+  timesheet  Timesheet @relation(fields: [timesheetId], references: [id])
+  supervisor User      @relation("SupervisorApprovals", fields: [supervisorId], references: [id])
+
+  @@index([tenantId, timesheetId])
+  @@index([tenantId, supervisorId, resultingState])
+  @@map("approvals")
+}
+
+// ─── KPI — Phase 9 ───────────────────────────────────────────────────────────
+
+model KpiTemplate {
+  id              String        @id @default(uuid()) @db.Uuid
+  tenantId        String        @map("tenant_id") @db.Uuid
+  organizationId  String        @map("organization_id") @db.Uuid
+  name            String
+  description     String?
+  metricType      KpiMetricType @map("metric_type")
+  period          KpiPeriod
+  targetValue     Decimal       @map("target_value") @db.Decimal(12, 2)
+  appliesTo       Json?         @map("applies_to")
+  templateVersion Int           @default(1) @map("template_version")
+  createdBy       String?       @map("created_by") @db.Uuid
+  updatedBy       String?       @map("updated_by") @db.Uuid
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt       DateTime?     @map("deleted_at") @db.Timestamptz
+  version         Int           @default(0)
+
+  organization Organization  @relation(fields: [tenantId, organizationId], references: [tenantId, id])
+  progress     KpiProgress[]
+
+  @@unique([tenantId, organizationId, name])
+  @@index([tenantId, organizationId])
+  @@map("kpi_templates")
+}
+
+model KpiProgress {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  kpiTemplateId  String    @map("kpi_template_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  periodKey      String    @map("period_key")
+  currentValue   Decimal   @default(0) @map("current_value") @db.Decimal(12, 2)
+  targetValue    Decimal   @map("target_value") @db.Decimal(12, 2)
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  version        Int       @default(0)
+
+  kpiTemplate KpiTemplate @relation(fields: [kpiTemplateId], references: [id])
+  user        User        @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, kpiTemplateId, userId, periodKey])
+  @@index([tenantId, organizationId, userId])
+  @@map("kpi_progress")
+}
+
+// ─── Payroll Preparation — Phase 9 ───────────────────────────────────────────
+
+model PayrollPeriod {
+  id             String              @id @default(uuid()) @db.Uuid
+  tenantId       String              @map("tenant_id") @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  type           PayrollPeriodType
+  status         PayrollPeriodStatus @default(OPEN)
+  startDate      DateTime            @map("start_date") @db.Date
+  endDate        DateTime            @map("end_date") @db.Date
+  lockedAt       DateTime?           @map("locked_at") @db.Timestamptz
+  exportedAt     DateTime?           @map("exported_at") @db.Timestamptz
+  createdBy      String?             @map("created_by") @db.Uuid
+  updatedBy      String?             @map("updated_by") @db.Uuid
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime?           @map("deleted_at") @db.Timestamptz
+  version        Int                 @default(0)
+
+  organization Organization    @relation(fields: [tenantId, organizationId], references: [tenantId, id])
+  reports      PayrollReport[]
+
+  @@unique([tenantId, organizationId, startDate, endDate])
+  @@index([tenantId, organizationId, status])
+  @@map("payroll_periods")
+}
+
+model PayrollReport {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  payrollPeriodId String    @map("payroll_period_id") @db.Uuid
+  generatedBy     String    @map("generated_by") @db.Uuid
+  exportPdfKey    String?   @map("export_pdf_key")
+  exportXlsxKey   String?   @map("export_xlsx_key")
+  totals          Json?     @map("totals")
+  createdBy       String?   @map("created_by") @db.Uuid
+  updatedBy       String?   @map("updated_by") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+  version         Int       @default(0)
+
+  period    PayrollPeriod     @relation(fields: [payrollPeriodId], references: [id])
+  lineItems PayrollLineItem[]
+
+  @@index([tenantId, payrollPeriodId])
+  @@map("payroll_reports")
+}
+
+model PayrollLineItem {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  payrollReportId String   @map("payroll_report_id") @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  approvedHours   Decimal  @default(0) @map("approved_hours") @db.Decimal(8, 2)
+  pendingHours    Decimal  @default(0) @map("pending_hours") @db.Decimal(8, 2)
+  rejectedHours   Decimal  @default(0) @map("rejected_hours") @db.Decimal(8, 2)
+  overtimeHours   Decimal  @default(0) @map("overtime_hours") @db.Decimal(8, 2)
+  hourlyRate      Decimal  @map("hourly_rate") @db.Decimal(12, 2)
+  estimatedPay    Decimal  @map("estimated_pay") @db.Decimal(14, 2)
+  createdBy       String?  @map("created_by") @db.Uuid
+  updatedBy       String?  @map("updated_by") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  version         Int      @default(0)
+
+  payrollReport PayrollReport @relation(fields: [payrollReportId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
+
+  @@unique([payrollReportId, userId])
+  @@index([tenantId, payrollReportId])
+  @@map("payroll_line_items")
+}
+
+// ─── Notifications — Phase 4 §16 ─────────────────────────────────────────────
+
+enum NotificationType {
+  SUBMISSION
+  APPROVAL_DECISION
+  REVISION_REQUEST
+  DEADLINE
+  PAYROLL_READY
+  AI_REPORT
+
+  @@map("notification_type")
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+
+  @@map("notification_channel")
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  READ
+  FAILED
+
+  @@map("notification_status")
+}
+
+model Notification {
+  id        String             @id @default(uuid()) @db.Uuid
+  tenantId  String             @map("tenant_id") @db.Uuid
+  userId    String             @map("user_id") @db.Uuid
+  type      NotificationType
+  channel   NotificationChannel
+  status    NotificationStatus @default(PENDING)
+  payload   Json               @default("{}")
+  createdBy String?            @map("created_by") @db.Uuid
+  updatedBy String?            @map("updated_by") @db.Uuid
+  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime?          @map("deleted_at") @db.Timestamptz
+  version   Int                @default(0)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, userId, status, createdAt(sort: Desc)])
+  @@index([tenantId, userId, type])
+  @@map("notifications")
+}
+
+// ─── AI Jobs & Results — Phase 4 §17 ─────────────────────────────────────────
+
+enum AiFeature {
+  DAILY_SUMMARY
+  WEEKLY_SUMMARY
+  TIMESHEET_SUMMARY
+  PAYROLL_VALIDATION
+  KPI_ANALYSIS
+  BLOCKER_DETECTION
+  PRODUCTIVITY_INSIGHT
+  SUPERVISOR_ADVISORY
+
+  @@map("ai_feature")
+}
+
+enum AiProvider {
+  OPENAI
+  ANTHROPIC
+  LOCAL
+
+  @@map("ai_provider")
+}
+
+enum AiJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+
+  @@map("ai_job_status")
+}
+
+model AiJob {
+  id          String      @id @default(uuid()) @db.Uuid
+  tenantId    String      @map("tenant_id") @db.Uuid
+  feature     AiFeature
+  provider    AiProvider  @default(ANTHROPIC)
+  model       String      @default("claude-haiku-4-5-20251001")
+  status      AiJobStatus @default(QUEUED)
+  subjectId   String?     @map("subject_id") @db.Uuid
+  subjectType String?     @map("subject_type")
+  totalTokens Int?        @map("total_tokens")
+  cost        Decimal?    @db.Decimal(10, 6)
+  latencyMs   Int?        @map("latency_ms")
+  errorMsg    String?     @map("error_msg")
+  createdBy   String?     @map("created_by") @db.Uuid
+  updatedBy   String?     @map("updated_by") @db.Uuid
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt   DateTime?   @map("deleted_at") @db.Timestamptz
+  version     Int         @default(0)
+
+  result AiResult?
+  audit  AiAudit?
+
+  @@index([tenantId, status, createdAt(sort: Desc)])
+  @@index([tenantId, feature, subjectId])
+  @@map("ai_jobs")
+}
+
+model AiAudit {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  aiJobId         String   @unique @map("ai_job_id") @db.Uuid
+  promptHash      String?  @map("prompt_hash")
+  responseHash    String?  @map("response_hash")
+  executionTimeMs Int?     @map("execution_time_ms")
+  createdBy       String?  @map("created_by") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  job AiJob @relation(fields: [aiJobId], references: [id])
+
+  @@index([tenantId, aiJobId])
+  @@map("ai_audit")
+}
+
+model AiResult {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  aiJobId        String   @unique @map("ai_job_id") @db.Uuid
+  summary        String?
+  recommendation String?
+  confidence     Decimal? @db.Decimal(5, 4)
+  createdBy      String?  @map("created_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  job AiJob @relation(fields: [aiJobId], references: [id])
+
+  @@index([tenantId, aiJobId])
+  @@map("ai_results")
+}

@@ -1,0 +1,82 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: timeforge_owner
+      POSTGRES_PASSWORD: owner_password
+      POSTGRES_DB: timeforge
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U timeforge_owner -d timeforge']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      API_PORT: '3000'
+      # Dev default uses the owner role (tenant isolation enforced at the Prisma
+      # middleware layer). To enable DB-level RLS, run scripts/apply-rls.js and
+      # switch this to the timeforge_app role (see README → Row-Level Security).
+      DATABASE_URL: postgresql://timeforge_owner:owner_password@postgres:5432/timeforge?schema=public
+      DIRECT_URL: postgresql://timeforge_owner:owner_password@postgres:5432/timeforge?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_ACCESS_SECRET: docker-access-secret
+      JWT_REFRESH_SECRET: docker-refresh-secret
+      CORS_ORIGINS: http://localhost:3001
+    command: >
+      sh -c "npx prisma db push --skip-generate &&
+             npm run db:seed &&
+             node dist/apps/api/main.js"
+    ports:
+      - '3000:3000'
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://timeforge_owner:owner_password@postgres:5432/timeforge?schema=public
+      DIRECT_URL: postgresql://timeforge_owner:owner_password@postgres:5432/timeforge?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_ACCESS_SECRET: docker-access-secret
+      JWT_REFRESH_SECRET: docker-refresh-secret
+    command: ['node', 'dist/apps/worker/main.js']
+
+volumes:
+  pgdata:

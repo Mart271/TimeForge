@@ -1,0 +1,25 @@
+import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class CreateDepartmentDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  name!: string;
+}
+
+export class UpdateDepartmentDto {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  name?: string;
+
+  @Type(() => Number)
+  version!: number;
+}
+
+export class DeleteVersionDto {
+  @Type(() => Number)
+  version!: number;
+}
