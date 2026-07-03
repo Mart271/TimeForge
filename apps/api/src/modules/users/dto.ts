@@ -11,7 +11,7 @@ import {
   IsInt,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { EmploymentType } from '@prisma/client';
+import { EmploymentType, UserStatus } from '@prisma/client';
 
 export class CreateUserDto {
   @IsEmail()
@@ -84,6 +84,15 @@ export class UpdateUserDto {
   @IsBoolean()
   @Type(() => Boolean)
   payrollEligible?: boolean;
+
+  @IsOptional()
+  @IsEnum(UserStatus)
+  status?: UserStatus;
+
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  isApproved?: boolean;
 
   @IsInt()
   @Type(() => Number)

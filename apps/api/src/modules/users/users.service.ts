@@ -9,10 +9,14 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuthPrincipal } from '../../common/decorators';
 import { buildPage, decodeCursor } from '../../common/crud/crud.service';
 import { CreateUserDto, UpdateUserDto, UpdateMeDto, AssignRolesDto, UsersListQuery } from './dto';
+import { MailerService } from '../../infra/mailer.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailer: MailerService,
+  ) {}
 
   private isFinanceOrAdmin(user: AuthPrincipal): boolean {
     return user.roles.some((r) => r === 'FINANCE' || r === 'ADMIN') || user.permissions.includes('*');
@@ -132,6 +136,37 @@ export class UsersService {
       data: { ...rest, updatedBy: caller.userId, version: { increment: 1 } },
     });
     await this.audit(caller.tenantId, caller.userId, AuditAction.ADMIN_ACTION, 'user', id);
+
+    // Send account-approved email when admin activates a previously PENDING user.
+    const isBeingApproved =
+      existing.status === 'PENDING' &&
+      dto.status === 'ACTIVE' &&
+      dto.isApproved === true;
+
+    if (isBeingApproved) {
+      const fullName = `${existing.firstName} ${existing.lastName}`;
+      void this.mailer
+        .send(
+          existing.email,
+          'Your TimeForge Account Has Been Approved',
+          [
+            `Hello ${fullName},`,
+            '',
+            'Great news! Your TimeForge account has been reviewed and approved by an administrator.',
+            '',
+            'You can now sign in to TimeForge using the email address and password you registered with.',
+            '',
+            'If you have any questions, please reach out to your HR or system administrator.',
+            '',
+            'Best regards,',
+            'The TimeForge Team',
+          ].join('\n'),
+        )
+        .catch((err: unknown) =>
+          console.error('[UsersService] Approval email failed silently:', err),
+        );
+    }
+
     return this.findOne(caller, id);
   }
 

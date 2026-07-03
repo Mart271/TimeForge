@@ -11,6 +11,7 @@ import * as argon2 from 'argon2';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { AuditAction, EmploymentType, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { MailerService } from '../../infra/mailer.service';
 import { RegisterDto } from './dto';
 
 interface JwtConfig {
@@ -33,6 +34,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly mailer: MailerService,
   ) {}
 
   private jwtCfg(): JwtConfig {
@@ -49,6 +51,11 @@ export class AuthService {
       include: { roles: { include: { role: true } } },
     });
     if (!user || !user.passwordHash) throw new UnauthorizedException('Invalid credentials');
+    if (user.status === 'PENDING' || !user.isApproved) {
+      throw new UnauthorizedException(
+        'Your account is awaiting administrator approval. Please check your email for updates.',
+      );
+    }
     if (user.status !== 'ACTIVE') throw new UnauthorizedException('Account is not active');
 
     const valid = await argon2.verify(user.passwordHash, password);
@@ -184,19 +191,38 @@ export class AuthService {
         jobTitle: dto.jobTitle,
         departmentId: department.id,
         employmentType: EmploymentType.EMPLOYEE,
-        status: UserStatus.INVITED,
+        status: UserStatus.PENDING,
+        isApproved: false,
         emailVerifiedAt: new Date(),
       },
     });
     await this.prisma.userRole.create({ data: { userId: user.id, roleId: role.id } });
     await this.audit(tenant.id, user.id, AuditAction.ADMIN_ACTION);
 
-    // TODO: Send registration confirmation email once an email provider (SMTP / SES)
-    // is configured. Email should contain:
-    //   Subject: "TimeForge Account Registration Received"
-    //   Body: Greeting with employee name, confirmation that the account was created,
-    //         notice that admin approval is required, and a follow-up email promise.
-    //   See: implementation_plan.md §2 for the full email template.
+    // Send welcome email asynchronously — failure must NOT roll back account creation.
+    const fullName = `${dto.firstName} ${dto.lastName}`;
+    void this.mailer
+      .send(
+        email,
+        'Welcome to TimeForge – Registration Received',
+        [
+          `Hello ${fullName},`,
+          '',
+          'Thank you for registering with TimeForge!',
+          '',
+          'Your account has been created successfully and is currently pending administrator approval.',
+          'You will receive another email as soon as your account is approved and ready to use.',
+          '',
+          'If you did not create this account, please ignore this email.',
+          '',
+          'Best regards,',
+          'The TimeForge Team',
+        ].join('\n'),
+      )
+      .catch((err: unknown) =>
+        // Log but do not propagate — email failure must not affect registration response
+        console.error('[AuthService] Welcome email failed silently:', err),
+      );
   }
 
   // Public department list for the signup form's department picker, scoped to

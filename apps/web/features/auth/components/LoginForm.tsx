@@ -106,10 +106,15 @@ export function LoginForm() {
     } catch (err) {
       // Surface the backend's own message verbatim (e.g. "Email not verified",
       // "Invalid credentials"), except for the pending-approval case which gets
-      // a user-friendly replacement.
+      // a user-friendly multi-line replacement.
       const msg = err instanceof ApiError ? err.message : "Something went wrong";
-      if (msg.toLowerCase().includes("account is not active")) {
-        setServerError("Your account is still pending administrator approval. You will receive an email once your account has been approved.");
+      if (
+        msg.toLowerCase().includes("awaiting administrator approval") ||
+        msg.toLowerCase().includes("account is not active")
+      ) {
+        setServerError(
+          "Your account is awaiting administrator approval. Please check your email for updates. You will receive another email once your account has been approved."
+        );
       } else {
         setServerError(msg);
       }
@@ -133,10 +138,10 @@ export function LoginForm() {
             role="alert"
             className="mb-4 rounded-[10px] border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
           >
-            <p className="font-bold">✓ Account created successfully.</p>
-            {/* TODO: Show "A confirmation email has been sent" once the backend email pipeline is available. */}
-            <p className="mt-1">A confirmation email has been sent.</p>
-            <p className="mt-1">Your account is awaiting administrator approval.</p>
+            <p className="font-bold">✓ Account created successfully!</p>
+            <p className="mt-1">A confirmation email has been sent to your Gmail.</p>
+            <p className="mt-1">Your account is currently waiting for administrator approval.</p>
+            <p className="mt-1">You will receive another email once your account has been approved.</p>
           </div>
         ) : null}
 

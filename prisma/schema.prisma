@@ -20,6 +20,7 @@ datasource db {
 // ─── Enums ──────────────────────────────────────────────────────────────────
 
 enum UserStatus {
+  PENDING
   INVITED
   ACTIVE
   SUSPENDED
@@ -187,7 +188,8 @@ model User {
   lastName        String         @map("last_name")
   phone           String?        @map("phone")
   jobTitle        String?        @map("job_title")
-  status          UserStatus     @default(INVITED)
+  status          UserStatus     @default(PENDING)
+  isApproved      Boolean        @default(false) @map("is_approved")
   employmentType  EmploymentType @default(EMPLOYEE) @map("employment_type")
   hourlyRate      Decimal?       @map("hourly_rate") @db.Decimal(12, 2)
   payrollEligible Boolean        @default(true) @map("payroll_eligible")
