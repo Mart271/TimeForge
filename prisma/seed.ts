@@ -131,6 +131,17 @@ async function main() {
     create: { tenantId: tenant.id, organizationId: org.id, name: 'Human Resources', createdBy: admin.id, updatedBy: admin.id },
   });
 
+  // Assign demo staff to Engineering so profile-driven fields (e.g. the
+  // Daily Scrum "Department" auto-fill) have data out of the box.
+  await prisma.user.updateMany({
+    where: {
+      tenantId: tenant.id,
+      email: { in: ['employee@demo.test', 'intern@demo.test', 'supervisor@demo.test'] },
+      departmentId: null,
+    },
+    data: { departmentId: engineeringDept.id },
+  });
+
   // Team
   const backendTeam = await prisma.team.upsert({
     where: { tenantId_organizationId_name: { tenantId: tenant.id, organizationId: org.id, name: 'Backend' } },

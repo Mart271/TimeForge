@@ -1,12 +1,19 @@
 import type { Metadata } from "next";
-import { Hanken_Grotesk } from "next/font/google";
+import { DM_Sans, Inter } from "next/font/google";
 import "./globals.css";
 import { AppProviders } from "@/providers/app-providers";
 
-const hanken = Hanken_Grotesk({
-  variable: "--font-hanken",
+// Style guide fonts: Inter for body copy, DM Sans for display/headings.
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
   display: "swap",
 });
 
@@ -21,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${hanken.variable} antialiased`}>
+    <html lang="en" className={`${inter.variable} ${dmSans.variable} antialiased`}>
       <body className="font-sans">
         <AppProviders>{children}</AppProviders>
       </body>

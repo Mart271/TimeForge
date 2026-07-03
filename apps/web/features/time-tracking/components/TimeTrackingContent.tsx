@@ -1,26 +1,41 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { SunsetIcon } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/ErrorState";
-import { listTimeEntries } from "../api/time-entries.service";
+import { Toast, type ToastState } from "@/components/shared/Toast";
+import { listTimeEntries, listAllTimeEntries } from "../api/time-entries.service";
 import { listScrumEntries } from "@/features/scrum/api/scrum.service";
+import { getMe } from "@/features/account/api/account.service";
+import { fetchDepartments } from "@/features/auth/api/auth.service";
 import { summarizeDay } from "../lib/day-summary";
-import { TimerCard, clearBreakFlag } from "./TimerCard";
-import { CurrentContextCard } from "./CurrentContextCard";
-import { TimeEntryForm } from "./TimeEntryForm";
+import { deriveTasks, splitDescription, taskKey, type WorkTask } from "../lib/task-select";
+import { clearBreakFlag } from "../lib/break-flag";
+import { CurrentSessionCard } from "./CurrentSessionCard";
+import { ScrumTaskCard } from "./ScrumTaskCard";
+import { WorkDetailsCard } from "./WorkDetailsCard";
+import { QuickSelectRail } from "./QuickSelectRail";
+import { TodayProgressCard } from "./TodayProgressCard";
 import { TodayEntriesList } from "./TodayEntriesList";
-import { DailyScrumCard } from "./DailyScrumCard";
 import { EodReviewModal } from "./EodReviewModal";
-import { startOfDay, endOfDay, toIsoDate } from "@/lib/time";
+import { startOfDay, endOfDay, toIsoDate, minutesBetween, weekWindow } from "@/lib/time";
 
+/**
+ * Daily Scrum page — task-driven workflow. Main column: Current Session →
+ * Daily Scrum card → Work Details → Today's Entries; right rail: Quick
+ * Select + Today's Progress. All data comes from existing endpoints
+ * (time-entries, scrum-entries, catalogs, users/me, dashboard/summary).
+ */
 export function TimeTrackingContent() {
   const [eodOpen, setEodOpen] = useState(false);
   const [dayClosed, setDayClosed] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<WorkTask | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
   const today = useMemo(() => new Date(), []);
+  const week = useMemo(() => weekWindow(today), [today]);
 
   const entriesQuery = useQuery({
     queryKey: ["time-entries", "today"],
@@ -33,14 +48,43 @@ export function TimeTrackingContent() {
     refetchInterval: 60_000,
   });
 
+  // This week's entries feed Quick Select tasks and the progress chart.
+  const weekQuery = useQuery({
+    queryKey: ["time-entries", "week-all", toIsoDate(week.from)],
+    queryFn: () =>
+      listAllTimeEntries({ from: week.from.toISOString(), to: week.to.toISOString() }),
+  });
+
+  // A running entry can predate today (e.g. the user never timed out
+  // yesterday) — today's window would miss it, showing "idle" while the
+  // backend rejects new starts. Query it explicitly and fold it in.
+  const runningQuery = useQuery({
+    queryKey: ["time-entries", "running"],
+    queryFn: () => listTimeEntries({ running: true, limit: 1 }),
+  });
+
   const scrumQuery = useQuery({
     queryKey: ["scrum-entries", "today"],
     queryFn: () => listScrumEntries({ from: toIsoDate(today), to: toIsoDate(today), limit: 1 }),
   });
 
-  const entries = useMemo(() => entriesQuery.data?.data ?? [], [entriesQuery.data]);
+  const meQuery = useQuery({ queryKey: ["users", "me"], queryFn: getMe });
+  const departmentsQuery = useQuery({ queryKey: ["auth", "departments"], queryFn: fetchDepartments });
+
+  const entries = useMemo(() => {
+    const todays = entriesQuery.data?.data ?? [];
+    const running = runningQuery.data?.data[0];
+    if (running && !todays.some((e) => e.id === running.id)) return [...todays, running];
+    return todays;
+  }, [entriesQuery.data, runningQuery.data]);
+  const weekEntries = useMemo(() => weekQuery.data ?? [], [weekQuery.data]);
   const summary = useMemo(() => summarizeDay(entries), [entries]);
   const scrumEntry = scrumQuery.data?.data[0] ?? null;
+
+  const departmentName = useMemo(() => {
+    const id = meQuery.data?.departmentId;
+    return (id && departmentsQuery.data?.find((d) => d.id === id)?.name) || null;
+  }, [meQuery.data, departmentsQuery.data]);
 
   // Most recent completed entry today — seeds "Resume Shift" context.
   const lastEntry = useMemo(() => {
@@ -49,11 +93,48 @@ export function TimeTrackingContent() {
     return completed.reduce((latest, e) => (e.endTime! > latest.endTime! ? e : latest));
   }, [entries]);
 
+  // Sum of completed entries today — the cumulative stopwatch baseline.
+  const completedMinutes = useMemo(
+    () =>
+      entries
+        .filter((e) => e.endTime)
+        .reduce((sum, e) => sum + (e.durationMinutes ?? minutesBetween(e.startTime, e.endTime!)), 0),
+    [entries],
+  );
+
+  // Distinct recent tasks (this week) for Quick Select and the scrum header.
+  const tasks = useMemo(() => deriveTasks(weekEntries), [weekEntries]);
+
+  // The task the scrum card is headed by: the running session's context,
+  // else the Quick Select choice, else the most recent task.
+  const currentTask = useMemo<WorkTask | null>(() => {
+    const running = summary.running;
+    if (running) {
+      const { task } = splitDescription(running.description);
+      const title = task || "General work";
+      return (
+        tasks.find((t) => t.key === taskKey(running.projectId, title)) ?? {
+          key: taskKey(running.projectId, title),
+          title,
+          projectId: running.projectId,
+          clientId: running.clientId,
+          workCategoryId: running.workCategoryId,
+          details: splitDescription(running.description).details,
+          minutes: 0,
+          lastUsedAt: running.startTime,
+        }
+      );
+    }
+    return selectedTask ?? tasks[0] ?? null;
+  }, [summary.running, selectedTask, tasks]);
+
+  const onToast = useCallback((t: ToastState) => setToast(t), []);
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="Active Session"
-        subtitle="Track time accurately for precise KPI alignment."
+        title="Daily Scrum"
+        subtitle="Run your session, plan today's tasks, and submit your scrum."
         action={
           <button
             type="button"
@@ -81,33 +162,65 @@ export function TimeTrackingContent() {
           onRetry={() => entriesQuery.refetch()}
         />
       ) : entriesQuery.isLoading ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
           <div className="flex flex-col gap-4">
-            <Skeleton className="h-56" />
-            <Skeleton className="h-44" />
+            <Skeleton className="h-64" />
+            <Skeleton className="h-96" />
+            <Skeleton className="h-96" />
           </div>
-          <Skeleton className="h-[420px] lg:col-span-2" />
+          <div className="flex flex-col gap-4">
+            <Skeleton className="h-72" />
+            <Skeleton className="h-80" />
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
-          <div className="flex flex-col gap-4">
-            <TimerCard
-              running={summary.running}
+        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+          {/* Main column */}
+          <div className="flex min-w-0 flex-col gap-4">
+            <CurrentSessionCard
+              summary={summary}
               lastEntry={lastEntry}
+              completedMinutes={completedMinutes}
+              selectedTask={selectedTask}
               loading={entriesQuery.isFetching}
               onTimeOut={() => setEodOpen(true)}
             />
-            <CurrentContextCard summary={summary} />
+
+            <ScrumTaskCard
+              entry={scrumEntry}
+              task={currentTask}
+              trackedMinutes={summary.trackedMinutes}
+              loading={scrumQuery.isLoading}
+              onToast={onToast}
+            />
+
+            <WorkDetailsCard
+              key={summary.running?.id ?? "idle"}
+              running={summary.running}
+              selectedTask={selectedTask}
+              departmentName={departmentName}
+              onToast={onToast}
+            />
+
+            <TodayEntriesList entries={entries} />
           </div>
-          <div className="lg:col-span-2">
-            <TimeEntryForm />
+
+          {/* Right rail */}
+          <div className="flex min-w-0 flex-col gap-4">
+            <QuickSelectRail
+              tasks={tasks}
+              loading={weekQuery.isLoading}
+              onSelect={setSelectedTask}
+              onToast={onToast}
+            />
+            <TodayProgressCard
+              summary={summary}
+              weekEntries={weekEntries}
+              weekLoading={weekQuery.isLoading}
+            />
           </div>
         </div>
       )}
-
-      <TodayEntriesList entries={entries} />
-
-      <DailyScrumCard entry={scrumEntry} />
 
       <EodReviewModal
         open={eodOpen}
@@ -116,9 +229,14 @@ export function TimeTrackingContent() {
         scrumEntry={scrumEntry}
         onSubmitted={() => {
           clearBreakFlag();
+          if (typeof window !== "undefined") {
+            window.localStorage.removeItem("timeforge.session-accumulated-seconds");
+          }
           setDayClosed(true);
         }}
       />
+
+      <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }

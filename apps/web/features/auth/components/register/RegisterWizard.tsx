@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AuthSplitLayout } from "../AuthSplitLayout";
-import { Step1Aside, Step2Aside } from "./RegisterAside";
+import { AuthAside } from "../AuthAside";
 import { RegisterStep1Form } from "./RegisterStep1Form";
 import { RegisterStep2Form } from "./RegisterStep2Form";
 import { register as registerUser } from "../../api/auth.service";
@@ -17,7 +17,13 @@ function splitName(fullName: string): { firstName: string; lastName: string } {
   return { firstName, lastName };
 }
 
-const emptyStep1: RegisterStep1Values = { fullName: "", email: "", companyName: "", phone: "" };
+const emptyStep1: RegisterStep1Values = {
+  fullName: "",
+  email: "",
+  phone: "",
+  departmentId: "",
+  agreeToTerms: false,
+};
 
 export function RegisterWizard() {
   const router = useRouter();
@@ -33,7 +39,7 @@ export function RegisterWizard() {
     const { firstName, lastName } = splitName(step1.fullName);
     // The design omits a job-title field; the backend register DTO requires
     // one, so we default it (all self-signups become EMPLOYEE anyway).
-    // companyName and workCategory have no backend home and are not sent.
+    // workCategory has no backend home and is not sent.
     await registerUser({
       email: step1.email,
       password: values.password,
@@ -43,13 +49,14 @@ export function RegisterWizard() {
       jobTitle: "Employee",
       departmentId: values.departmentId,
     });
-    // Never auto-login — new users wait for admin approval.
-    router.push("/registration-pending");
+    // Never auto-login — back to sign-in with the email prefilled and a
+    // success banner (LoginForm reads these params).
+    router.push(`/login?registered=1&email=${encodeURIComponent(step1.email)}`);
   };
 
   return (
     <AuthSplitLayout
-      aside={step === 1 ? <Step1Aside /> : <Step2Aside />}
+      aside={<AuthAside />}
       topRight={
         <>
           <span className="hidden text-brand-muted sm:inline">Already have an account?</span>
@@ -62,7 +69,11 @@ export function RegisterWizard() {
       {step === 1 ? (
         <RegisterStep1Form defaultValues={step1} onNext={handleNext} />
       ) : (
-        <RegisterStep2Form onSubmit={handleSubmit} onBack={() => setStep(1)} />
+        <RegisterStep2Form
+          onSubmit={handleSubmit}
+          onBack={() => setStep(1)}
+          defaultDepartmentId={step1.departmentId}
+        />
       )}
     </AuthSplitLayout>
   );

@@ -26,9 +26,11 @@ import { ApiError } from "@/lib/api/client";
 interface Props {
   onSubmit: (values: RegisterStep2Values) => Promise<void>;
   onBack: () => void;
+  /** Department chosen on step 1 — prefilled here, still editable. */
+  defaultDepartmentId?: string;
 }
 
-export function RegisterStep2Form({ onSubmit, onBack }: Props) {
+export function RegisterStep2Form({ onSubmit, onBack, defaultDepartmentId }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -47,7 +49,7 @@ export function RegisterStep2Form({ onSubmit, onBack }: Props) {
     defaultValues: {
       password: "",
       confirmPassword: "",
-      departmentId: "",
+      departmentId: defaultDepartmentId ?? "",
       workCategory: "",
       agreeToTerms: false,
     },
@@ -98,12 +100,12 @@ export function RegisterStep2Form({ onSubmit, onBack }: Props) {
             invalid={Boolean(errors.password)}
             {...register("password")}
           />
+          {/* Figma copy says 12 chars + special symbol, but the backend
+              policy (RegisterDto) is 8–128 chars — backend is truth. */}
           {errors.password ? (
             <FieldError message={errors.password.message} />
           ) : (
-            <p className="mt-1 text-xs text-brand-muted/80">
-              Must be at least 12 characters with one special symbol.
-            </p>
+            <p className="mt-1 text-xs text-brand-muted/80">Must be at least 8 characters.</p>
           )}
         </div>
 
@@ -128,7 +130,13 @@ export function RegisterStep2Form({ onSubmit, onBack }: Props) {
               control={control}
               name="departmentId"
               render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  // `items` lets the closed trigger resolve the label for a
+                  // prefilled value (otherwise it renders the raw id).
+                  items={(departments ?? []).map((d) => ({ value: d.id, label: d.name }))}
+                >
                   <SelectTrigger
                     id="departmentId"
                     aria-label="Department"
@@ -181,11 +189,11 @@ export function RegisterStep2Form({ onSubmit, onBack }: Props) {
           />
           <label htmlFor="agreeToTerms" className="text-xs leading-relaxed text-brand-muted">
             I agree to the{" "}
-            <Link href="/terms" className="font-semibold text-brand hover:underline">
+            <Link href="?modal=terms" className="font-semibold text-brand hover:underline">
               Terms of Service
             </Link>{" "}
             and acknowledge the{" "}
-            <Link href="/privacy" className="font-semibold text-brand hover:underline">
+            <Link href="?modal=privacy" className="font-semibold text-brand hover:underline">
               Privacy Policy
             </Link>
             .
@@ -198,12 +206,14 @@ export function RegisterStep2Form({ onSubmit, onBack }: Props) {
           <ArrowRight className="h-[18px] w-[18px]" />
         </SubmitButton>
 
-        <p className="text-center text-sm text-brand-muted">
-          Having trouble?{" "}
-          <Link href="/support" className="font-semibold text-brand hover:underline">
-            Contact Support
-          </Link>
-        </p>
+        <div className="border-t border-[#c3c6d2]/40 pt-4">
+          <p className="text-center text-sm text-brand-muted">
+            Having trouble?{" "}
+            <Link href="/support" className="font-semibold text-brand hover:underline">
+              Contact Support
+            </Link>
+          </p>
+        </div>
       </form>
     </AuthCard>
   );

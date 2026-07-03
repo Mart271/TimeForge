@@ -12,14 +12,17 @@ export const loginSchema = z.object({
 });
 export type LoginValues = z.infer<typeof loginSchema>;
 
-// Step 1 of the registration wizard. "companyName" is collected for visual
-// parity with the design but is NOT part of the backend contract, so it stays
-// optional and is never sent.
+// Step 1 of the registration wizard (Figma: Full Name, Email, Department,
+// terms). Phone is not in the design but the backend RegisterDto requires it,
+// so it stays as a natural extension of the same layout.
 export const registerStep1Schema = z.object({
   fullName: z.string().min(1, "Full name is required").max(200),
-  email: z.string().min(1, "Work email is required").email("Enter a valid email address"),
-  companyName: z.string().max(200).optional(),
+  email: z.string().min(1, "Email address is required").email("Enter a valid email address"),
   phone: z.string().min(1, "Phone number is required").max(30),
+  departmentId: z.string().min(1, "Select a department").uuid("Select a department"),
+  agreeToTerms: z.boolean().refine((v) => v === true, {
+    message: "You must agree to the Terms of Service",
+  }),
 });
 export type RegisterStep1Values = z.infer<typeof registerStep1Schema>;
 

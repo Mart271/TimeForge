@@ -10,6 +10,7 @@ export interface Me {
   phone: string | null;
   status: string;
   employmentType: string;
+  departmentId: string | null;
   roles: { role: { key: string; name: string } }[];
 }
 

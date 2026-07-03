@@ -65,6 +65,25 @@ export async function listTimeEntries(query: TimeEntryQuery = {}): Promise<Page<
   return data;
 }
 
+/**
+ * Fetches every entry in a range by following cursor pagination (the API
+ * caps `limit` per page). Hard-capped at 10 pages / 1000 entries as a
+ * safety valve for pathological ranges.
+ */
+export async function listAllTimeEntries(
+  query: Omit<TimeEntryQuery, "cursor"> = {},
+): Promise<TimeEntry[]> {
+  const all: TimeEntry[] = [];
+  let cursor: string | undefined;
+  for (let i = 0; i < 10; i++) {
+    const page = await listTimeEntries({ ...query, limit: query.limit ?? 100, cursor });
+    all.push(...page.data);
+    if (!page.page.hasMore || !page.page.nextCursor) break;
+    cursor = page.page.nextCursor;
+  }
+  return all;
+}
+
 export async function createTimeEntry(payload: CreateTimeEntryPayload): Promise<TimeEntry> {
   const { data } = await apiClient.post<TimeEntry>("/time-entries", payload);
   return data;
@@ -77,6 +96,23 @@ export async function startTimer(payload: StartTimerPayload = {}): Promise<TimeE
 
 export async function stopTimer(id: string): Promise<TimeEntry> {
   const { data } = await apiClient.post<TimeEntry>(`/time-entries/${id}/stop`);
+  return data;
+}
+
+export interface UpdateTimeEntryPayload {
+  startTime?: string;
+  endTime?: string;
+  projectId?: string;
+  clientId?: string;
+  workCategoryId?: string;
+  description?: string;
+  referenceLinks?: string[];
+  /** Optimistic-lock version — required by UpdateTimeEntryDto. */
+  version: number;
+}
+
+export async function updateTimeEntry(id: string, payload: UpdateTimeEntryPayload): Promise<TimeEntry> {
+  const { data } = await apiClient.patch<TimeEntry>(`/time-entries/${id}`, payload);
   return data;
 }
 

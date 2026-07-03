@@ -21,15 +21,32 @@ export const manualEntrySchema = z
 
 export type ManualEntryValues = z.infer<typeof manualEntrySchema>;
 
-/** Daily Scrum form (bottom of the Time Tracker page). */
+/**
+ * Daily Scrum card. Yesterday / Today / Blockers are all required before
+ * submission (write "None" when there are no blockers) — the API itself
+ * treats blockers as optional, so this is a workflow rule, not a DTO rule.
+ */
 export const dailyScrumSchema = z.object({
   yesterday: z.string().min(1, "Tell the team what you completed yesterday").max(5000),
   today: z.string().min(1, "List your main objectives for today").max(5000),
-  blockers: z.string().max(5000).optional(),
+  blockers: z.string().min(1, 'Blockers are required — write "None" if you have none').max(5000),
   notes: z.string().max(2000).optional(),
+  progress: z.number().int().min(0).max(100, "Progress cannot exceed 100%"),
+  status: z.enum(["NOT_STARTED", "IN_PROGRESS", "BLOCKED", "COMPLETED"]),
 });
 
 export type DailyScrumValues = z.infer<typeof dailyScrumSchema>;
+
+/** Work Details card — context saved onto the running time entry. */
+export const workDetailsSchema = z.object({
+  task: z.string().max(200, "Keep the task name under 200 characters").optional(),
+  workDescription: z.string().max(4500, "Keep the description under 4500 characters").optional(),
+  clientId: z.string().optional(),
+  projectId: z.string().optional(),
+  workCategoryId: z.string().optional(),
+});
+
+export type WorkDetailsValues = z.infer<typeof workDetailsSchema>;
 
 /** End of Day Review modal. */
 export const eodReviewSchema = z.object({

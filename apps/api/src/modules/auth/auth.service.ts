@@ -190,6 +190,13 @@ export class AuthService {
     });
     await this.prisma.userRole.create({ data: { userId: user.id, roleId: role.id } });
     await this.audit(tenant.id, user.id, AuditAction.ADMIN_ACTION);
+
+    // TODO: Send registration confirmation email once an email provider (SMTP / SES)
+    // is configured. Email should contain:
+    //   Subject: "TimeForge Account Registration Received"
+    //   Body: Greeting with employee name, confirmation that the account was created,
+    //         notice that admin approval is required, and a follow-up email promise.
+    //   See: implementation_plan.md §2 for the full email template.
   }
 
   // Public department list for the signup form's department picker, scoped to

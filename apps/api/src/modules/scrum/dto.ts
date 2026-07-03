@@ -1,12 +1,16 @@
 import {
   IsBoolean,
   IsDateString,
+  IsEnum,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
+  Min,
   IsInt,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ScrumTaskStatus } from '@prisma/client';
 
 export class CreateScrumEntryDto {
   /** ISO date string, e.g. "2026-06-30" — must not be in the future. */
@@ -30,6 +34,18 @@ export class CreateScrumEntryDto {
   @IsString()
   @MaxLength(2000)
   notes?: string;
+
+  /** Self-reported task progress for the day, 0–100. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  @Type(() => Number)
+  progress?: number;
+
+  @IsOptional()
+  @IsEnum(ScrumTaskStatus)
+  status?: ScrumTaskStatus;
 }
 
 export class UpdateScrumEntryDto {
@@ -52,6 +68,18 @@ export class UpdateScrumEntryDto {
   @IsString()
   @MaxLength(2000)
   notes?: string;
+
+  /** Self-reported task progress for the day, 0–100. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  @Type(() => Number)
+  progress?: number;
+
+  @IsOptional()
+  @IsEnum(ScrumTaskStatus)
+  status?: ScrumTaskStatus;
 
   @IsInt()
   @Type(() => Number)

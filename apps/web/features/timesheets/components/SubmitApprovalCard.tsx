@@ -17,14 +17,24 @@ interface SubmitApprovalCardProps {
   onSaveDraft: (notes: string) => void;
 }
 
+/** Merges the three human-input fields into the single `summary` API field. */
+function buildSummary(workSummary: string, accomplishments: string, blockers: string): string {
+  const parts: string[] = [];
+  if (workSummary.trim()) parts.push(workSummary.trim());
+  if (accomplishments.trim()) parts.push(`Accomplishments:\n${accomplishments.trim()}`);
+  if (blockers.trim()) parts.push(`Challenges / Blockers:\n${blockers.trim()}`);
+  return parts.join("\n\n");
+}
+
 /**
- * "Submit for Approval" band (bottom of Submit Timesheet). Notes map to the
- * timesheet `summary` field.
+ * "Submit for Approval" band (bottom of Smart Timesheet). The employee
+ * reviews auto-generated session data above, then fills in Work Summary,
+ * Accomplishments, and Blockers here. All three are merged into the single
+ * `summary` field that the API accepts — no backend changes required.
  *
- * BACKEND GAP — the design shows the approving supervisor's name and a
- * submission deadline; neither is exposed by the API (approver is resolved
- * team-side at review time, deadlines aren't modelled), so those slots show
- * the period end and an unassigned note instead.
+ * BACKEND GAP — approving supervisor name and submission deadline are not
+ * exposed by the API (approver is resolved team-side at review time, deadlines
+ * aren't modelled), so those slots show the period end and an unassigned note.
  */
 export function SubmitApprovalCard({
   timesheet,
@@ -35,21 +45,24 @@ export function SubmitApprovalCard({
   onSubmit,
   onSaveDraft,
 }: SubmitApprovalCardProps) {
-  const [notes, setNotes] = useState("");
+  const [workSummary, setWorkSummary] = useState("");
+  const [accomplishments, setAccomplishments] = useState("");
+  const [blockers, setBlockers] = useState("");
   const canSubmit = useCan("timesheet:submit");
 
   const status = timesheet?.status ?? "DRAFT";
   const locked = status !== "DRAFT" && status !== "REVISION_REQUESTED";
 
+  const combinedNotes = buildSummary(workSummary, accomplishments, blockers);
+
   return (
     <div className="rounded-[16px] border border-[#c3c6d2]/50 bg-[#f6f3f4] p-[25px] shadow-[0px_1px_1px_rgba(0,0,0,0.05)]">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Left: meta info */}
         <div>
           <div className="flex items-center gap-3">
             <h3 className="text-xl font-semibold text-brand-navy">Submit for Approval</h3>
-            {timesheet ? (
-              <StatusBadge {...timesheetStatusTone(status)} />
-            ) : null}
+            {timesheet ? <StatusBadge {...timesheetStatusTone(status)} /> : null}
           </div>
           <p className="mt-2 text-sm leading-relaxed text-brand-muted">
             I hereby certify that the hours recorded above represent a true and accurate record of
@@ -80,38 +93,80 @@ export function SubmitApprovalCard({
           </div>
         </div>
 
-        <div className="flex flex-col">
-          <label htmlFor="submit-notes" className="mb-1.5 text-sm font-medium text-brand-navy">
-            Notes to Supervisor (Optional)
-          </label>
-          <Textarea
-            id="submit-notes"
-            rows={4}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            maxLength={5000}
-            disabled={locked}
-            placeholder="Add any context for overtime or specific project adjustments..."
-            className="bg-white"
-          />
+        {/* Right: structured human-input fields */}
+        <div className="flex flex-col gap-4">
+          {/* Work Summary */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="ts-work-summary" className="text-sm font-medium text-brand-navy">
+              Work Summary{" "}
+              <span className="text-xs font-normal text-brand-muted">(required for submission)</span>
+            </label>
+            <Textarea
+              id="ts-work-summary"
+              rows={3}
+              value={workSummary}
+              onChange={(e) => setWorkSummary(e.target.value)}
+              maxLength={2000}
+              disabled={locked}
+              placeholder="Briefly describe the work completed during this pay period..."
+              className="bg-white"
+            />
+          </div>
+
+          {/* Accomplishments */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="ts-accomplishments" className="text-sm font-medium text-brand-navy">
+              Accomplishments{" "}
+              <span className="text-xs font-normal text-brand-muted">(optional)</span>
+            </label>
+            <Textarea
+              id="ts-accomplishments"
+              rows={2}
+              value={accomplishments}
+              onChange={(e) => setAccomplishments(e.target.value)}
+              maxLength={2000}
+              disabled={locked}
+              placeholder="Key achievements or milestones this period..."
+              className="bg-white"
+            />
+          </div>
+
+          {/* Challenges / Blockers */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="ts-blockers" className="text-sm font-medium text-brand-navy">
+              Challenges / Blockers{" "}
+              <span className="text-xs font-normal text-brand-muted">(optional)</span>
+            </label>
+            <Textarea
+              id="ts-blockers"
+              rows={2}
+              value={blockers}
+              onChange={(e) => setBlockers(e.target.value)}
+              maxLength={2000}
+              disabled={locked}
+              placeholder="Any issues, risks, or items needing supervisor attention..."
+              className="bg-white"
+            />
+          </div>
 
           {error ? (
-            <p role="alert" className="mt-2 rounded-[8px] bg-red-50 px-3 py-2 text-sm text-red-600">
+            <p role="alert" className="rounded-[8px] bg-red-50 px-3 py-2 text-sm text-red-600">
               {error}
             </p>
           ) : null}
+
           {locked ? (
-            <p role="status" className="mt-2 rounded-[8px] bg-brand-cyan/10 px-3 py-2 text-sm text-brand-navy">
+            <p role="status" className="rounded-[8px] bg-brand-cyan/10 px-3 py-2 text-sm text-brand-navy">
               This period&apos;s timesheet is {timesheetStatusTone(status).label.toLowerCase()} — no further
               edits until it&apos;s reviewed.
             </p>
           ) : null}
 
           {canSubmit ? (
-            <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
-                onClick={() => onSubmit(notes)}
+                onClick={() => onSubmit(combinedNotes)}
                 disabled={submitting || locked}
                 className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[10px] bg-brand px-6 text-sm font-bold text-white transition-colors hover:bg-[#1467d6] disabled:opacity-60"
               >
@@ -124,7 +179,7 @@ export function SubmitApprovalCard({
               </button>
               <button
                 type="button"
-                onClick={() => onSaveDraft(notes)}
+                onClick={() => onSaveDraft(combinedNotes)}
                 disabled={savingDraft || locked}
                 className="flex h-11 items-center justify-center rounded-[10px] bg-[#e4e2e3] px-6 text-sm font-bold text-brand-navy transition-colors hover:bg-[#d8d6d7] disabled:opacity-60"
               >
@@ -133,7 +188,7 @@ export function SubmitApprovalCard({
               </button>
             </div>
           ) : (
-            <p className="mt-3 text-sm text-brand-muted">
+            <p className="text-sm text-brand-muted">
               Your role doesn&apos;t allow submitting timesheets.
             </p>
           )}

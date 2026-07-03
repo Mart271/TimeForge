@@ -21,17 +21,23 @@ import {
 } from "../api/timesheets.service";
 import { summarizePeriod } from "../lib/period-summary";
 import { EntryAuditTable } from "./EntryAuditTable";
+import { MyTimesheetCard } from "./MyTimesheetCard";
 import { SubmitApprovalCard } from "./SubmitApprovalCard";
 import { TimesheetHistoryCard } from "./TimesheetHistoryCard";
+import { SessionSummaryCard } from "./SessionSummaryCard";
+import { DayTimelineCard } from "./DayTimelineCard";
 import {
   currentPayPeriod,
   endOfDay,
   formatMinutesClock,
   formatPeriodRange,
   minutesToHours,
+  startOfDay,
   toIsoDate,
 } from "@/lib/time";
 import { ApiError } from "@/lib/api/client";
+import { summarizeDay, buildDayTimeline } from "@/features/time-tracking/lib/day-summary";
+import { readBreakStart } from "@/features/time-tracking/lib/break-flag";
 
 export function TimesheetsContent() {
   const queryClient = useQueryClient();
@@ -41,6 +47,18 @@ export function TimesheetsContent() {
   const period = useMemo(() => currentPayPeriod(now), [now]);
   const periodDayCount = Math.round((period.end.getTime() - period.start.getTime()) / 86_400_000) + 1;
 
+  // ── Today's entries (for Session Summary + Timeline) ──────────────────────
+  const todayEntriesQuery = useQuery({
+    queryKey: ["time-entries", "today", toIsoDate(now)],
+    queryFn: () =>
+      listTimeEntries({
+        from: startOfDay(now).toISOString(),
+        to: endOfDay(now).toISOString(),
+        limit: 100,
+      }),
+  });
+
+  // ── Period entries (for audit table + metric cards) ───────────────────────
   const timesheetsQuery = useQuery({
     queryKey: ["timesheets", "current-period"],
     queryFn: () =>
@@ -60,12 +78,29 @@ export function TimesheetsContent() {
   const { data: projects } = useQuery({ queryKey: ["catalog", "projects"], queryFn: listProjects });
 
   const timesheet: Timesheet | null = timesheetsQuery.data?.data[0] ?? null;
+
+  // ── Period-level aggregation ───────────────────────────────────────────────
   const entries = useMemo(() => entriesQuery.data?.data ?? [], [entriesQuery.data]);
   const summary = useMemo(
     () => summarizePeriod(entries, projects, period.start, period.end, now),
     [entries, projects, period, now],
   );
 
+  // ── Today-level aggregation (Session Summary + Timeline) ──────────────────
+  const todayEntries = useMemo(
+    () => todayEntriesQuery.data?.data ?? [],
+    [todayEntriesQuery.data],
+  );
+  const onBreak = useMemo(() => {
+    // A running entry always beats the break flag.
+    const hasRunning = todayEntries.some((e) => !e.endTime);
+    return !hasRunning && Boolean(readBreakStart());
+  }, [todayEntries]);
+
+  const daySummary = useMemo(() => summarizeDay(todayEntries, now), [todayEntries, now]);
+  const timeline = useMemo(() => buildDayTimeline(todayEntries, onBreak), [todayEntries, onBreak]);
+
+  // ── Mutations ─────────────────────────────────────────────────────────────
   /** Draft timesheet for the period, creating it on first save/submit. */
   const ensureTimesheet = async (): Promise<Timesheet> => {
     if (timesheet) return timesheet;
@@ -116,12 +151,13 @@ export function TimesheetsContent() {
   });
 
   const loading = timesheetsQuery.isLoading || entriesQuery.isLoading;
+  const todayLoading = todayEntriesQuery.isLoading;
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="Submit Timesheet"
-        subtitle="Review your hours for the current pay period before submission."
+        title="Smart Timesheet"
+        subtitle="Your session data is recorded automatically. Review and add your work summary below."
         action={
           <Tooltip>
             <TooltipTrigger
@@ -142,6 +178,17 @@ export function TimesheetsContent() {
         }
       />
 
+      {/* ── Session Summary Card (today's auto-generated session) ───────────── */}
+      <SessionSummaryCard
+        summary={daySummary}
+        onBreak={onBreak}
+        loading={todayLoading}
+      />
+
+      {/* ── Daily Activity Timeline ────────────────────────────────────────── */}
+      <DayTimelineCard events={timeline} loading={todayLoading} />
+
+      {/* ── Period Metric Cards ────────────────────────────────────────────── */}
       {entriesQuery.isError ? (
         <ErrorState message="Could not load this period's entries." onRetry={() => entriesQuery.refetch()} />
       ) : loading ? (
@@ -217,12 +264,17 @@ export function TimesheetsContent() {
         </div>
       )}
 
+      {/* ── My Timesheet (per-day smart view: stats, range, search, CSV) ──── */}
+      <MyTimesheetCard />
+
+      {/* ── Entry Audit Table (period, read-only from the system) ─────────── */}
       <EntryAuditTable
         entries={entries}
         overtimeDays={summary.overtimeDays}
         periodDayCount={periodDayCount}
       />
 
+      {/* ── Submit for Approval (human-input: summary, accomplishments, blockers) */}
       <SubmitApprovalCard
         timesheet={timesheet}
         periodEndLabel={period.end.toLocaleDateString("en-US", {
@@ -243,6 +295,7 @@ export function TimesheetsContent() {
         }}
       />
 
+      {/* ── History ───────────────────────────────────────────────────────── */}
       <TimesheetHistoryCard />
     </div>
   );

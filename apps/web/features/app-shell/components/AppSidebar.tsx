@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutGrid,
-  Clock,
+  Timer,
   FileText,
   Wallet,
   BarChart3,
@@ -23,7 +23,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
-  { href: "/time-tracking", label: "Time Tracking", icon: Clock },
+  { href: "/time-tracking", label: "Daily Scrum", icon: Timer },
   { href: "/timesheets", label: "Time Sheet", icon: FileText },
   { href: "/payslips", label: "Payslips", icon: Wallet },
   { href: "/reports", label: "Reports", icon: BarChart3 },
@@ -57,7 +57,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
       >
         <div className="flex items-start justify-between px-6 pb-8">
           <div>
-            <Logo variant="stacked" />
+            <Logo href="/dashboard" />
             <p className="mt-1 text-[10px] font-normal uppercase tracking-[1px] text-brand-muted/70">
               Workforce Management
             </p>

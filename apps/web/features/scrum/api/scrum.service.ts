@@ -1,6 +1,8 @@
 import { apiClient } from "@/lib/api/client";
 import type { Page } from "@/features/time-tracking/api/time-entries.service";
 
+export type ScrumTaskStatus = "NOT_STARTED" | "IN_PROGRESS" | "BLOCKED" | "COMPLETED";
+
 export interface ScrumEntry {
   id: string;
   userId: string;
@@ -9,6 +11,11 @@ export interface ScrumEntry {
   today: string;
   blockers: string | null;
   notes: string | null;
+  /** Self-reported task progress for the day, 0–100. */
+  progress: number;
+  status: ScrumTaskStatus;
+  createdAt: string;
+  updatedAt: string;
   version: number;
 }
 
@@ -18,6 +25,8 @@ export interface CreateScrumEntryPayload {
   today: string;
   blockers?: string;
   notes?: string;
+  progress?: number;
+  status?: ScrumTaskStatus;
 }
 
 export interface UpdateScrumEntryPayload {
@@ -25,6 +34,8 @@ export interface UpdateScrumEntryPayload {
   today?: string;
   blockers?: string;
   notes?: string;
+  progress?: number;
+  status?: ScrumTaskStatus;
   version: number;
 }
 

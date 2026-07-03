@@ -102,7 +102,7 @@ export function EntryAuditTable({ entries, overtimeDays, periodDayCount }: Entry
           rows={visible}
           rowKey={(e) => e.id}
           emptyState={
-            <EmptyState message="No time entries in this pay period yet — log time from the Time Tracking page." />
+            <EmptyState message="No time entries in this pay period yet — log time from the Daily Scrum page." />
           }
         />
       </div>

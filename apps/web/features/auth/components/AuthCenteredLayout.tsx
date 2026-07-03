@@ -5,9 +5,9 @@ interface AuthCenteredLayoutProps {
   children: React.ReactNode;
   topCenter?: React.ReactNode;
   topRight?: React.ReactNode;
-  /** Extra content rendered under the card (e.g. the login trust row). */
+  /** Extra content rendered under the card. */
   belowCard?: React.ReactNode;
-  /** Optional decorative background layer (e.g. login gradient blobs). */
+  /** Optional decorative background layer. */
   decor?: React.ReactNode;
 }
 
@@ -23,8 +23,8 @@ export function AuthCenteredLayout({
       <AuthTopBar center={topCenter} right={topRight} />
       <main className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-12">
         {decor ? <div className="pointer-events-none absolute inset-0">{decor}</div> : null}
-        <div className="relative z-10 w-full max-w-[420px]">{children}</div>
-        {belowCard ? <div className="relative z-10 mt-8 w-full max-w-[420px]">{belowCard}</div> : null}
+        <div className="relative z-10 w-full max-w-[440px]">{children}</div>
+        {belowCard ? <div className="relative z-10 mt-8 w-full max-w-[440px]">{belowCard}</div> : null}
       </main>
       <AuthFooter />
     </div>
