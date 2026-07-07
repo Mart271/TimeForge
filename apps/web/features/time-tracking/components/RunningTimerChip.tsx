@@ -4,33 +4,32 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Timer } from "lucide-react";
-import { listTimeEntries } from "../api/time-entries.service";
-import { formatStopwatch, startOfDay, endOfDay } from "@/lib/time";
+import { getCurrentWorkSession } from "../api/work-sessions.service";
+import { formatStopwatch } from "@/lib/time";
 
 /**
  * Persistent running-session indicator for the top bar: ticking elapsed time
  * wherever the user navigates, linking back to the tracker.
  *
- * Shows the cumulative day total (all completed entries + the running
- * segment) using the same formula as CurrentSessionCard, so the chip and the
- * tracker card always agree. Shares the tracker page's query key/cache.
+ * Reads the same WorkSession (GET /work-sessions/current, shared query key
+ * with CurrentSessionCard) and applies the identical clockIn-minus-breaks
+ * formula, so the chip and the tracker card always agree — this used to
+ * reconstruct elapsed time from today's time entries plus a
+ * "session-accumulated-seconds" localStorage value that nothing ever wrote,
+ * which could drift arbitrarily far from the real session.
  */
 export function RunningTimerChip() {
   const [now, setNow] = useState(() => Date.now());
 
-  const { data } = useQuery({
-    queryKey: ["time-entries", "today"],
-    queryFn: () =>
-      listTimeEntries({
-        from: startOfDay(new Date()).toISOString(),
-        to: endOfDay(new Date()).toISOString(),
-        limit: 100,
-      }),
+  const { data: workSession } = useQuery({
+    queryKey: ["work-session", "current"],
+    queryFn: getCurrentWorkSession,
     refetchInterval: 30_000,
   });
 
-  const entries = data?.data ?? [];
-  const running = entries.find((e) => !e.endTime) ?? null;
+  const session = workSession?.session ?? null;
+  const onBreak = workSession?.onBreak ?? false;
+  const running = Boolean(session?.isActive && !onBreak);
 
   useEffect(() => {
     if (!running) return;
@@ -38,13 +37,10 @@ export function RunningTimerChip() {
     return () => clearInterval(id);
   }, [running]);
 
-  if (!running) return null;
+  if (!running || !session) return null;
 
-  // Mirror CurrentSessionCard: read accumulated session seconds from localStorage.
-  const accumulated = typeof window !== "undefined"
-    ? parseFloat(window.localStorage.getItem("timeforge.session-accumulated-seconds") ?? "0")
-    : 0;
-  const elapsed = accumulated + Math.max(0, (now - new Date(running.startTime).getTime()) / 1000);
+  const breakMinutes = session.breakMinutes ?? 0;
+  const elapsed = Math.max(0, (now - new Date(session.clockIn).getTime()) / 1000 - breakMinutes * 60);
 
   return (
     <Link

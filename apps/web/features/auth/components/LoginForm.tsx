@@ -126,23 +126,25 @@ export function LoginForm() {
   return (
     <AuthCard>
       <div className="mb-6 text-center">
-        <h1 className="text-[26px] font-bold leading-tight text-brand-navy">Welcome back</h1>
-        <p className="mt-1 text-sm text-brand-muted">Access your workforce workspace</p>
+        <h1 className="text-h2 text-brand-navy">Welcome back</h1>
+        <p className="text-body mt-1 text-brand-muted">Access your workforce workspace</p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
         {serverError ? (
           <FormBanner message={serverError} />
         ) : justRegistered ? (
-          <div
-            role="alert"
-            className="mb-4 rounded-[10px] border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
-          >
-            <p className="font-bold">✓ Account created successfully!</p>
-            <p className="mt-1">A confirmation email has been sent to your Gmail.</p>
-            <p className="mt-1">Your account is currently waiting for administrator approval.</p>
-            <p className="mt-1">You will receive another email once your account has been approved.</p>
-          </div>
+          <FormBanner
+            variant="success"
+            message={
+              <>
+                <p className="font-bold">✓ Account created successfully!</p>
+                <p className="mt-1">A confirmation email has been sent to your Gmail.</p>
+                <p className="mt-1">Your account is currently waiting for administrator approval.</p>
+                <p className="mt-1">You will receive another email once your account has been approved.</p>
+              </>
+            }
+          />
         ) : null}
 
         <div>

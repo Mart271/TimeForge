@@ -5,6 +5,7 @@ import {
   IsUUID,
   MaxLength,
   IsInt,
+  ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -58,8 +59,51 @@ export interface TimesheetQuery {
   cursor?: string;
   status?: string;
   userId?: string;
+  departmentId?: string;
+  search?: string; // employee first/last name, case-insensitive
   from?: string; // filter by periodStart >= from
   to?: string;   // filter by periodStart <= to
+  sortBy?: string; // 'periodStart' | 'totalMinutes' | 'status' | 'submittedAt' — defaults to periodStart
+  sortDir?: string; // 'asc' | 'desc' — defaults to desc
+}
+
+export interface TimesheetStatsQuery {
+  departmentId?: string;
+  from?: string;
+  to?: string;
+}
+
+export interface TimesheetChartQuery {
+  weeks?: string; // number of weeks for the weekly-submissions series, default 4
+  months?: string; // number of months for the monthly-trend series, default 6
+}
+
+export class BulkTimesheetItemDto {
+  @IsUUID()
+  timesheetId!: string;
+
+  @IsInt()
+  @Type(() => Number)
+  expectedVersion!: number;
+}
+
+export class BulkApproveTimesheetsDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BulkTimesheetItemDto)
+  items!: BulkTimesheetItemDto[];
+}
+
+export class BulkRejectTimesheetsDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BulkTimesheetItemDto)
+  items!: BulkTimesheetItemDto[];
+
+  /** Required per BR-APP-02 — applied identically to every item in the batch. */
+  @IsString()
+  @MaxLength(2000)
+  remark!: string;
 }
 
 export interface TimesheetHistoryQuery {

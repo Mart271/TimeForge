@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsBoolean,
   IsEmail,
   IsEnum,
@@ -9,6 +10,7 @@ import {
   MaxLength,
   MinLength,
   IsInt,
+  ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { EmploymentType, UserStatus } from '@prisma/client';
@@ -51,6 +53,29 @@ export class CreateUserDto {
   payrollEligible?: boolean;
 }
 
+export class BulkImportEmployeesDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateUserDto)
+  users!: CreateUserDto[];
+}
+
+export interface EmployeesExportQuery {
+  status?: string;
+  departmentId?: string;
+  teamId?: string;
+  role?: string;
+  q?: string;
+}
+
+export interface PendingAccountsQuery {
+  departmentId?: string;
+  role?: string;
+  q?: string;
+  limit?: string;
+  cursor?: string;
+}
+
 export class UpdateUserDto {
   @IsOptional()
   @IsString()
@@ -63,6 +88,11 @@ export class UpdateUserDto {
   @IsNotEmpty()
   @MaxLength(100)
   lastName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  phone?: string;
 
   @IsOptional()
   @IsEnum(EmploymentType)
@@ -111,6 +141,26 @@ export class UpdateMeDto {
   @IsNotEmpty()
   @MaxLength(100)
   lastName?: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  phone?: string;
+}
+
+export class ChangePasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  currentPassword!: string;
+
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  newPassword!: string;
 }
 
 export class AssignRolesDto {

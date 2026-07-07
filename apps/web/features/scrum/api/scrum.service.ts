@@ -139,6 +139,12 @@ export async function updateScrumEntry(id: string, payload: UpdateScrumEntryPayl
   return data;
 }
 
+/** Supervisor feedback on a team member's scrum entry — stored as ScrumEntry.supervisorNote. */
+export async function commentOnScrumEntry(id: string, comment: string, version: number): Promise<ScrumEntry> {
+  const { data } = await apiClient.post<ScrumEntry>(`/scrum-entries/${id}/comment`, { comment, version });
+  return data;
+}
+
 // ── Scrum Tasks ────────────────────────────────────────────────────────────────
 
 export async function listScrumTasks(entryId: string): Promise<ScrumTask[]> {

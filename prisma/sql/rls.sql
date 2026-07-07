@@ -40,7 +40,11 @@ DECLARE
     -- Notifications & AI jobs (Phase 4)
     'notifications', 'ai_jobs', 'ai_audit', 'ai_results',
     -- Session tracking (WorkSession/SessionEvent/SessionAttachment expansion)
-    'work_sessions', 'session_events', 'session_attachments'
+    'work_sessions', 'session_events', 'session_attachments',
+    -- Security monitoring + generated report exports
+    'security_logs', 'security_alerts', 'generated_reports',
+    -- Team Schedules
+    'shifts'
   ];
 BEGIN
   FOREACH t IN ARRAY tenant_tables LOOP

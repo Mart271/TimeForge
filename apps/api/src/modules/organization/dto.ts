@@ -1,4 +1,4 @@
-import { IsInt, IsBoolean, IsDateString, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsInt, IsBoolean, IsDateString, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateOrgDto {
@@ -42,4 +42,9 @@ export class DeleteHolidayVersionDto {
   @IsInt()
   @Type(() => Number)
   version!: number;
+}
+
+export class ExportOrgStructureDto {
+  @IsEnum(['CSV', 'EXCEL', 'PDF'])
+  format!: 'CSV' | 'EXCEL' | 'PDF';
 }

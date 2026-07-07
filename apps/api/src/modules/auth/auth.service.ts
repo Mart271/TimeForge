@@ -15,6 +15,9 @@ import { MailerService } from '../../infra/mailer.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RegisterDto } from './dto';
 
+import { SecurityService } from '../security/security.service';
+import { SecuritySeverity, SecurityStatus } from '@prisma/client';
+
 interface JwtConfig {
   accessSecret: string;
   refreshSecret: string;
@@ -37,6 +40,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly mailer: MailerService,
     private readonly notifications: NotificationsService,
+    private readonly security: SecurityService,
   ) {}
 
   private jwtCfg(): JwtConfig {
@@ -47,12 +51,38 @@ export class AuthService {
     return createHash('sha256').update(value).digest('hex');
   }
 
-  async login(email: string, password: string, ip?: string) {
+  async login(email: string, password: string, ip?: string, device?: string) {
+    const normalizedEmail = email.toLowerCase();
     const user = await this.prisma.user.findFirst({
-      where: { email: email.toLowerCase() },
+      where: { email: normalizedEmail },
       include: { roles: { include: { role: true } } },
     });
-    if (!user || !user.passwordHash) throw new UnauthorizedException('Invalid credentials');
+
+    const clientIp = ip || 'unknown';
+
+    // 1. Check lockout status
+    if (user && user.lockoutUntil && user.lockoutUntil > new Date()) {
+      await this.security.logEvent(
+        user.tenantId,
+        user.organizationId,
+        user.id,
+        'LOGIN_LOCKED_ATTEMPT',
+        SecurityStatus.DENIED,
+        SecuritySeverity.HIGH,
+        clientIp,
+        { email: normalizedEmail, device },
+      );
+      const minutesLeft = Math.ceil((user.lockoutUntil.getTime() - Date.now()) / 60000);
+      throw new UnauthorizedException(
+        `Account is temporarily locked due to multiple failed login attempts. Try again in ${minutesLeft} minutes.`,
+      );
+    }
+
+    if (!user || !user.passwordHash) {
+      // Log failed attempt for non-existent user (use a dummy tenant/org or skip database constraint)
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
     if (user.status === 'PENDING') {
       throw new UnauthorizedException(
         'Your account is awaiting administrator approval. Please check your email for updates.',
@@ -66,12 +96,81 @@ export class AuthService {
     if (user.status !== 'ACTIVE') throw new UnauthorizedException('Account is not active');
 
     const valid = await argon2.verify(user.passwordHash, password);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
+    if (!valid) {
+      // Increment failed login count
+      const attempts = user.failedLoginAttempts + 1;
+      const lockoutUntil = attempts >= 5 ? new Date(Date.now() + 30 * 60 * 1000) : null;
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginAttempts: attempts >= 5 ? 0 : attempts, // Reset count on lockout to allow retry later
+          lockoutUntil,
+        },
+      });
+
+      if (attempts >= 5) {
+        await this.security.logEvent(
+          user.tenantId,
+          user.organizationId,
+          user.id,
+          'LOGIN_LOCKOUT',
+          SecurityStatus.DENIED,
+          SecuritySeverity.CRITICAL,
+          clientIp,
+          { email: normalizedEmail, attempts, device },
+        );
+        await this.security.createAlert(
+          user.tenantId,
+          user.organizationId,
+          'Multiple Failed Login Attempts',
+          `IP ${clientIp} attempted access 5 times on user ${user.email} triggering a 30-minute lockout.`,
+          SecuritySeverity.CRITICAL,
+          user.id,
+          clientIp,
+        );
+      } else {
+        await this.security.logEvent(
+          user.tenantId,
+          user.organizationId,
+          user.id,
+          'LOGIN_FAILED',
+          SecurityStatus.DENIED,
+          SecuritySeverity.MEDIUM,
+          clientIp,
+          { email: normalizedEmail, attempts, device },
+        );
+      }
+
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
     if (!user.emailVerifiedAt) throw new UnauthorizedException('Email not verified');
 
+    // Reset failed attempts on successful login
+    if (user.failedLoginAttempts > 0 || user.lockoutUntil) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0, lockoutUntil: null },
+      });
+    }
+
     const roleKeys = user.roles.map((ur) => ur.role.key);
-    const tokens = await this.issueTokens(user, roleKeys, ip);
+    const tokens = await this.issueTokens(user, roleKeys, ip, device);
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     await this.audit(user.tenantId, user.id, AuditAction.LOGIN);
+    
+    // Log successful security event
+    await this.security.logEvent(
+      user.tenantId,
+      user.organizationId,
+      user.id,
+      'LOGIN_SUCCESS',
+      SecurityStatus.SUCCESS,
+      SecuritySeverity.INFO,
+      clientIp,
+      { email: normalizedEmail, device },
+    );
 
     return {
       ...tokens,
@@ -84,10 +183,17 @@ export class AuthService {
     };
   }
 
-  private async issueTokens(user: UserForAuth, roleKeys: string[], ip?: string, familyId?: string) {
+  private async issueTokens(
+    user: UserForAuth,
+    roleKeys: string[],
+    ip?: string,
+    device?: string,
+    familyId?: string,
+  ) {
     const cfg = this.jwtCfg();
+    const fid = familyId ?? randomUUID();
     const accessToken = await this.jwt.signAsync(
-      { sub: user.id, tid: user.tenantId, oid: user.organizationId, roles: roleKeys },
+      { sub: user.id, tid: user.tenantId, oid: user.organizationId, roles: roleKeys, fid },
       { secret: cfg.accessSecret, expiresIn: cfg.accessTtl },
     );
 
@@ -97,7 +203,8 @@ export class AuthService {
         tenantId: user.tenantId,
         userId: user.id,
         tokenHash: this.sha256(rawRefresh),
-        familyId: familyId ?? randomUUID(),
+        familyId: fid,
+        device: device ?? null,
         ip: ip ?? null,
         expiresAt: new Date(Date.now() + cfg.refreshTtl * 1000),
       },
@@ -135,7 +242,7 @@ export class AuthService {
     });
     if (!user) throw new UnauthorizedException();
     const roleKeys = user.roles.map((ur) => ur.role.key);
-    return this.issueTokens(user, roleKeys, ip, existing.familyId);
+    return this.issueTokens(user, roleKeys, ip, existing.device ?? undefined, existing.familyId);
   }
 
   async logout(rawRefresh: string | undefined): Promise<void> {
@@ -293,12 +400,19 @@ export class AuthService {
       },
       select: { id: true },
     });
+    const fullName = `${dto.firstName} ${dto.lastName}`;
     await Promise.all(
       admins.map((admin) =>
-        this.notifications.create(tenantId, admin.id, 'EMPLOYEE_APPROVAL_REQUEST', {
-          userId: pendingUserId,
-          name: `${dto.firstName} ${dto.lastName}`,
-          email: dto.email.toLowerCase(),
+        this.notifications.create({
+          tenantId,
+          organizationId,
+          userId: admin.id,
+          type: 'EMPLOYEE_APPROVAL_REQUEST',
+          category: 'ACCOUNT',
+          priority: 'HIGH',
+          title: 'New employee awaiting approval',
+          message: `${fullName} registered and is awaiting approval.`,
+          metadata: { userId: pendingUserId, name: fullName, email: dto.email.toLowerCase() },
         }),
       ),
     );

@@ -83,3 +83,15 @@ export interface KpiProgressQuery {
   kpiTemplateId?: string;
   periodKey?: string;
 }
+
+export class SubmitCoachingDto {
+  @IsString()
+  userId!: string;
+
+  @IsString()
+  remarks!: string;
+}
+
+export interface TeamKpiQuery {
+  quarter?: string; // e.g. "Q1", "Q2", "Q3", "Q4"
+}

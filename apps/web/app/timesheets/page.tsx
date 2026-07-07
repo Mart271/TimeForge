@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { AppShell } from "@/features/app-shell/components/AppShell";
-import { TimesheetsContent } from "@/features/timesheets/components/TimesheetsContent";
+import { TimesheetsRouter } from "@/features/timesheets/components/TimesheetsRouter";
 
 export const metadata: Metadata = { title: "Time Sheet | TimeForge" };
 
 export default function TimesheetsPage() {
   return (
     <AppShell>
-      <TimesheetsContent />
+      <TimesheetsRouter />
     </AppShell>
   );
 }

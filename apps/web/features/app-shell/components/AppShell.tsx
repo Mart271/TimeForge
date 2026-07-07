@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/auth-provider";
 import { refresh as refreshSession } from "@/features/auth/api/auth.service";
 import { getMe } from "@/features/account/api/account.service";
+import { ProfileAccountModal } from "@/features/account/components/ProfileAccountModal";
+import { NotificationCenterModal } from "@/features/notifications/components/NotificationCenterModal";
 import { setAccessToken } from "@/lib/api/client";
-import { AppSidebar } from "./AppSidebar";
+import { AdminSidebar } from "./AdminSidebar";
 import { AppTopBar } from "./AppTopBar";
 
 /**
@@ -19,7 +21,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, setSession } = useAuth();
   const [restoreFailed, setRestoreFailed] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const attempted = useRef(false);
 
   useEffect(() => {
@@ -63,11 +64,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-white">
-      <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <AdminSidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <AppTopBar onMenuClick={() => setSidebarOpen(true)} />
+        <AppTopBar />
         <main className="flex-1 overflow-auto bg-white p-4 sm:p-6">{children}</main>
       </div>
+      <ProfileAccountModal />
+      <NotificationCenterModal />
     </div>
   );
 }

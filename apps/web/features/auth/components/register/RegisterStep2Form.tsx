@@ -74,8 +74,8 @@ export function RegisterStep2Form({ onSubmit, onBack, defaultDepartmentId }: Pro
     <AuthCard>
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-brand-navy">Complete Registration</h1>
-          <p className="mt-1 text-sm text-brand-muted">Step 2 of 2</p>
+          <h1 className="text-h2 text-brand-navy">Complete Registration</h1>
+          <p className="text-body mt-1 text-brand-muted">Step 2 of 2</p>
         </div>
         <button
           type="button"
@@ -141,7 +141,7 @@ export function RegisterStep2Form({ onSubmit, onBack, defaultDepartmentId }: Pro
                     id="departmentId"
                     aria-label="Department"
                     aria-invalid={Boolean(errors.departmentId)}
-                    className="h-11 w-full rounded-[10px] border-[#c3c6d2]"
+                    className="h-11 w-full rounded-lg border-[#c3c6d2]"
                   >
                     <SelectValue placeholder={departmentsLoading ? "Loading…" : "Select..."} />
                   </SelectTrigger>
@@ -203,7 +203,7 @@ export function RegisterStep2Form({ onSubmit, onBack, defaultDepartmentId }: Pro
 
         <SubmitButton loading={submitting} loadingText="Setting up…">
           Complete Setup
-          <ArrowRight className="h-[18px] w-[18px]" />
+          <ArrowRight className="h-4 w-4" />
         </SubmitButton>
 
         <div className="border-t border-[#c3c6d2]/40 pt-4">

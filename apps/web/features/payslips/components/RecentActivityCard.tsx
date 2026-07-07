@@ -5,15 +5,7 @@ import { Bell } from "lucide-react";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
-import { listNotifications, type AppNotification } from "@/features/notifications/api/notifications.service";
-
-function labelFor(n: AppNotification): string {
-  const payload = n.payload ?? {};
-  const message = payload["message"] ?? payload["title"] ?? payload["body"];
-  if (typeof message === "string" && message.trim()) return message;
-  // Fall back to a readable version of the type, e.g. TIMESHEET_SUBMITTED.
-  return n.type.replaceAll("_", " ").toLowerCase().replace(/^./, (c) => c.toUpperCase());
-}
+import { listNotifications } from "@/features/notifications/api/notifications.service";
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -29,8 +21,10 @@ function timeAgo(iso: string): string {
 export function RecentActivityCard() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["notifications", "recent"],
-    queryFn: () => listNotifications(5),
+    queryFn: () => listNotifications({ pageSize: 5 }),
   });
+
+  const items = data?.data ?? [];
 
   return (
     <SectionCard title="Recent Activity">
@@ -40,11 +34,11 @@ export function RecentActivityCard() {
           <Skeleton className="h-10" />
           <Skeleton className="h-10" />
         </div>
-      ) : isError || !data || data.length === 0 ? (
+      ) : isError || items.length === 0 ? (
         <EmptyState message="No recent activity to show yet." />
       ) : (
         <ol className="flex flex-col">
-          {data.map((n, i) => (
+          {items.map((n, i) => (
             <li
               key={n.id}
               className={
@@ -57,8 +51,8 @@ export function RecentActivityCard() {
                 <Bell className="h-4 w-4" aria-hidden="true" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-brand-ink">{labelFor(n)}</p>
-                <p className="text-xs text-brand-muted">{n.type.replaceAll("_", " ")}</p>
+                <p className="truncate text-sm font-semibold text-brand-ink">{n.title}</p>
+                <p className="truncate text-xs text-brand-muted">{n.message}</p>
               </div>
               <span className="shrink-0 text-xs text-brand-muted">{timeAgo(n.createdAt)}</span>
             </li>

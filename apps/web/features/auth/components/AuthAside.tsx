@@ -23,17 +23,17 @@ export function AuthAside() {
   return (
     <div className="hidden lg:block">
       <Logo size="lg" href="" />
-      <p className="mt-5 max-w-md text-[17px] leading-relaxed text-brand-muted">
+      <p className="text-body-lg mt-5 max-w-md text-brand-muted">
         TimeForge unifies time tracking, scheduling, analytics, daily work, finance into a single
         platform.
       </p>
       <ul className="mt-8 space-y-4">
         {FEATURES.map((f) => (
           <li key={f.title} className="flex items-center gap-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-brand/10 text-brand">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
               <f.icon className="h-5 w-5" aria-hidden="true" />
             </span>
-            <p className="text-[15px] font-bold text-brand-ink">{f.title}</p>
+            <p className="text-h4 text-brand-ink">{f.title}</p>
           </li>
         ))}
       </ul>

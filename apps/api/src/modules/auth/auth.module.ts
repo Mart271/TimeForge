@@ -6,9 +6,10 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { RbacModule } from '../rbac/rbac.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { SecurityModule } from '../security/security.module';
 
 @Module({
-  imports: [PassportModule, JwtModule.register({}), RbacModule, NotificationsModule],
+  imports: [PassportModule, JwtModule.register({}), RbacModule, NotificationsModule, SecurityModule],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],
 })

@@ -76,7 +76,7 @@ export function PrivacyPolicyModal({ open, onOpenChange }: PrivacyPolicyModalPro
           </div>
 
           {/* Contact Alert Box */}
-          <div className="rounded-[12px] border border-blue-100 bg-[#f0f9ff] p-4 text-sm text-[#0369a1]">
+          <div className="rounded-modal text-body border border-blue-100 bg-[#f0f9ff] p-4 text-[#0369a1]">
             <p>
               For privacy questions, contact your administrator or email{" "}
               <a 

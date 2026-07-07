@@ -21,7 +21,7 @@ export function SubmitButton({
       type="submit"
       disabled={disabled || loading}
       className={cn(
-        "flex h-11 w-full items-center justify-center gap-2 rounded-[10px] text-[15px] font-bold text-white transition-colors",
+        "text-body-lg flex h-11 w-full items-center justify-center gap-2 rounded-lg font-bold text-white transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
         "disabled:cursor-not-allowed disabled:opacity-60",
         tone === "dark"

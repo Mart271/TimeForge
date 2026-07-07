@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateDepartmentDto {
@@ -6,6 +6,10 @@ export class CreateDepartmentDto {
   @IsNotEmpty()
   @MaxLength(200)
   name!: string;
+
+  @IsOptional()
+  @IsUUID()
+  managerId?: string;
 }
 
 export class UpdateDepartmentDto {
@@ -14,6 +18,12 @@ export class UpdateDepartmentDto {
   @IsNotEmpty()
   @MaxLength(200)
   name?: string;
+
+  // Present + non-null → reassign manager; present + null → unassign; absent → leave unchanged.
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID()
+  managerId?: string | null;
 
   @IsInt()
   @Type(() => Number)

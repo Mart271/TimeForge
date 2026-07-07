@@ -53,6 +53,11 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  /* Design-system radius tokens — the two sizes used everywhere for
+     cards/panels and modals/toasts, matching the de facto standard already
+     established across the app (see docs/Design-System.md). */
+  --radius-card: 16px;
+  --radius-modal: 12px;
 }
 
 :root {
@@ -152,4 +157,55 @@
   h6 {
     font-family: var(--font-heading), var(--font-inter), sans-serif;
   }
+}
+
+/* ─── Design-system typography scale ─────────────────────────────────────────
+   The only approved text styles in the app. See docs/Design-System.md.
+   Do not add ad-hoc text-[Npx] font sizes outside this scale.
+   Tailwind v4 custom utilities must use `@utility` (not `@layer utilities
+   { .foo {} }` — the old v3 pattern is subject to candidate-scanning and
+   gets pruned since these class names aren't in Tailwind's own vocabulary). */
+@utility text-display-xl {
+  font-family: var(--font-heading), var(--font-inter), sans-serif;
+  font-weight: 700;
+  font-size: 36px;
+  line-height: 40px;
+}
+@utility text-h2 {
+  font-family: var(--font-heading), var(--font-inter), sans-serif;
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 32px;
+}
+@utility text-h3 {
+  font-family: var(--font-heading), var(--font-inter), sans-serif;
+  font-weight: 500;
+  font-size: 18px;
+  line-height: 28px;
+}
+@utility text-h4 {
+  font-family: var(--font-inter), sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 24px;
+}
+@utility text-body-lg {
+  font-family: var(--font-inter), sans-serif;
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 24px;
+}
+@utility text-body {
+  font-family: var(--font-inter), sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+}
+@utility text-label {
+  font-family: var(--font-inter), sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }

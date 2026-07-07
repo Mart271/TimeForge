@@ -26,14 +26,14 @@ export const IconInput = forwardRef<HTMLInputElement, IconInputProps>(
       <div className="relative">
         {Icon ? (
           <span className="pointer-events-none absolute inset-y-0 left-0 flex w-11 items-center justify-center text-brand-muted/70">
-            <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+            <Icon className="h-4 w-4" aria-hidden="true" />
           </span>
         ) : null}
         <input
           ref={ref}
           aria-invalid={invalid || undefined}
           className={cn(
-            "h-11 w-full rounded-[10px] border bg-white text-[15px] text-brand-ink transition-colors",
+            "text-body-lg h-11 w-full rounded-lg border bg-white text-brand-ink transition-colors",
             "placeholder:text-brand-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:border-brand",
             "disabled:cursor-not-allowed disabled:bg-[#f6f3f4] disabled:text-brand-muted/70",
             Icon ? "pl-11 pr-3.5" : "px-3.5",

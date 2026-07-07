@@ -99,6 +99,10 @@ enum AuditAction {
   AI_USAGE
   SETTINGS_CHANGE
   ADMIN_ACTION
+  PAYROLL_VALIDATED
+  PAYROLL_APPROVED
+  PAYROLL_REJECTED
+  PAYROLL_SENT_TO_BANK
 }
 
 enum TimeEntrySource {
@@ -151,6 +155,16 @@ enum PayrollPeriodStatus {
   EXPORTED
 }
 
+enum PayrollProcessingStatus {
+  DRAFT
+  VALIDATING
+  VALIDATED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  SENT_TO_BANK
+}
+
 // ─── Tenancy & Core Organization ────────────────────────────────────────────
 
 model Tenant {
@@ -193,6 +207,7 @@ model Organization {
   scrumEntries   ScrumEntry[]
   kpiTemplates   KpiTemplate[]
   payrollPeriods PayrollPeriod[]
+  shifts         Shift[]
 
   @@unique([tenantId, slug])
   @@unique([tenantId, id])
@@ -238,6 +253,8 @@ model User {
   employmentType  EmploymentType @default(EMPLOYEE) @map("employment_type")
   hourlyRate      Decimal?       @map("hourly_rate") @db.Decimal(12, 2)
   payrollEligible Boolean        @default(true) @map("payroll_eligible")
+  avatarKey       String?        @map("avatar_key")
+  lastLoginAt     DateTime?      @map("last_login_at") @db.Timestamptz
   emailVerifiedAt DateTime?      @map("email_verified_at") @db.Timestamptz
   rejectedAt      DateTime?      @map("rejected_at") @db.Timestamptz
   rejectionReason String?        @map("rejection_reason")
@@ -251,24 +268,34 @@ model User {
   deletedAt       DateTime?      @map("deleted_at") @db.Timestamptz
   version         Int            @default(0)
 
-  organization     Organization      @relation(fields: [tenantId, organizationId], references: [tenantId, id])
-  department       Department?       @relation(fields: [departmentId], references: [id])
-  team             Team?             @relation(fields: [teamId], references: [id])
-  roles            UserRole[]
-  refreshTokens    RefreshToken[]
-  timeEntries      TimeEntry[]
-  timesheets       Timesheet[]
-  scrumEntries     ScrumEntry[]
-  scrumTasks       ScrumTask[]
-  workSessions     WorkSession[]
-  kpiProgress      KpiProgress[]
-  approvals        Approval[]        @relation("SupervisorApprovals")
-  payrollLineItems PayrollLineItem[]
-  notifications    Notification[]
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockoutUntil        DateTime? @map("lockout_until") @db.Timestamptz
+
+  organization       Organization      @relation(fields: [tenantId, organizationId], references: [tenantId, id])
+  department         Department?       @relation(fields: [departmentId], references: [id])
+  team               Team?             @relation(fields: [teamId], references: [id])
+  roles              UserRole[]
+  refreshTokens      RefreshToken[]
+  timeEntries        TimeEntry[]
+  timesheets         Timesheet[]
+  scrumEntries       ScrumEntry[]
+  scrumTasks         ScrumTask[]
+  workSessions       WorkSession[]
+  kpiProgress        KpiProgress[]
+  approvals          Approval[]        @relation("SupervisorApprovals")
+  payrollLineItems   PayrollLineItem[]
+  notifications      Notification[]
+  sentNotifications  Notification[]    @relation("NotificationSender")
+  departmentsManaged Department[]      @relation("DepartmentManager")
+  securityLogs       SecurityLog[]
+  securityAlerts     SecurityAlert[]
+  generatedReports   GeneratedReport[]
+  shifts             Shift[]
 
   @@unique([tenantId, email])
   @@unique([tenantId, id])
   @@index([tenantId, organizationId])
+  @@index([tenantId, teamId])
   @@map("users")
 }
 
@@ -381,6 +408,7 @@ model Department {
   tenantId       String    @map("tenant_id") @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
   name           String
+  managerId      String?   @map("manager_id") @db.Uuid
   createdBy      String?   @map("created_by") @db.Uuid
   updatedBy      String?   @map("updated_by") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
@@ -389,8 +417,11 @@ model Department {
   version        Int       @default(0)
 
   organization Organization @relation(fields: [tenantId, organizationId], references: [tenantId, id])
+  manager      User?        @relation("DepartmentManager", fields: [managerId], references: [id])
   users        User[]
   teams        Team[]
+  projects     Project[]
+  shifts       Shift[]
 
   @@unique([tenantId, organizationId, name])
   @@index([tenantId, organizationId])
@@ -443,29 +474,39 @@ model Client {
   @@map("clients")
 }
 
+enum ProjectStatus {
+  ON_TRACK
+  AT_RISK
+  DELAYED
+}
+
 model Project {
-  id             String    @id @default(uuid()) @db.Uuid
-  tenantId       String    @map("tenant_id") @db.Uuid
-  organizationId String    @map("organization_id") @db.Uuid
+  id             String        @id @default(uuid()) @db.Uuid
+  tenantId       String        @map("tenant_id") @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
   name           String
   code           String
-  clientId       String?   @map("client_id") @db.Uuid
-  billable       Boolean   @default(true)
-  createdBy      String?   @map("created_by") @db.Uuid
-  updatedBy      String?   @map("updated_by") @db.Uuid
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
-  version        Int       @default(0)
+  clientId       String?       @map("client_id") @db.Uuid
+  departmentId   String?       @map("department_id") @db.Uuid
+  status         ProjectStatus @default(ON_TRACK)
+  billable       Boolean       @default(true)
+  createdBy      String?       @map("created_by") @db.Uuid
+  updatedBy      String?       @map("updated_by") @db.Uuid
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime?     @map("deleted_at") @db.Timestamptz
+  version        Int           @default(0)
 
   organization Organization @relation(fields: [tenantId, organizationId], references: [tenantId, id])
   client       Client?      @relation(fields: [clientId], references: [id])
+  department   Department?  @relation(fields: [departmentId], references: [id])
   timeEntries  TimeEntry[]
   scrumEntries ScrumEntry[]
   scrumTasks   ScrumTask[]
 
   @@unique([tenantId, organizationId, code])
   @@index([tenantId, organizationId])
+  @@index([tenantId, organizationId, departmentId])
   @@map("projects")
 }
 
@@ -578,6 +619,7 @@ model Timesheet {
 
   @@index([tenantId, userId, periodStart])
   @@index([tenantId, status, organizationId])
+  @@index([tenantId, organizationId, status, periodStart])
   @@map("timesheets")
 }
 
@@ -623,6 +665,7 @@ model ScrumEntry {
   @@unique([tenantId, userId, entryDate])
   @@index([tenantId, organizationId, entryDate])
   @@index([tenantId, userId, entryDate])
+  @@index([tenantId, organizationId, submittedAt])
   @@map("scrum_entries")
 }
 
@@ -753,6 +796,52 @@ model SessionAttachment {
   @@map("session_attachments")
 }
 
+// ─── Team Schedules ──────────────────────────────────────────────────────────
+
+enum ShiftStatus {
+  DRAFT
+  PUBLISHED
+
+  @@map("shift_status")
+}
+
+enum ShiftType {
+  MORNING
+  AFTERNOON
+  NIGHT
+  CUSTOM
+
+  @@map("shift_type")
+}
+
+model Shift {
+  id             String      @id @default(uuid()) @db.Uuid
+  tenantId       String      @map("tenant_id") @db.Uuid
+  organizationId String      @map("organization_id") @db.Uuid
+  userId         String      @map("user_id") @db.Uuid
+  departmentId   String?     @map("department_id") @db.Uuid
+  shiftDate      DateTime    @map("shift_date") @db.Date
+  startTime      DateTime    @map("start_time") @db.Timestamptz
+  endTime        DateTime    @map("end_time") @db.Timestamptz
+  shiftType      ShiftType   @default(CUSTOM) @map("shift_type")
+  status         ShiftStatus @default(DRAFT)
+  notes          String?
+  createdBy      String?     @map("created_by") @db.Uuid
+  updatedBy      String?     @map("updated_by") @db.Uuid
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime?   @map("deleted_at") @db.Timestamptz
+  version        Int         @default(0)
+
+  organization Organization @relation(fields: [tenantId, organizationId], references: [tenantId, id])
+  user         User         @relation(fields: [userId], references: [id])
+  department   Department?  @relation(fields: [departmentId], references: [id])
+
+  @@index([tenantId, organizationId, shiftDate])
+  @@index([tenantId, userId, shiftDate])
+  @@map("shifts")
+}
+
 // ─── Supervisor Approval — Phase 9 ───────────────────────────────────────────
 
 model Approval {
@@ -842,9 +931,19 @@ model PayrollPeriod {
   status         PayrollPeriodStatus @default(OPEN)
   startDate      DateTime            @map("start_date") @db.Date
   endDate        DateTime            @map("end_date") @db.Date
-  lockedAt       DateTime?           @map("locked_at") @db.Timestamptz
-  exportedAt     DateTime?           @map("exported_at") @db.Timestamptz
-  createdBy      String?             @map("created_by") @db.Uuid
+  lockedAt           DateTime?               @map("locked_at") @db.Timestamptz
+  exportedAt         DateTime?               @map("exported_at") @db.Timestamptz
+  processingStatus   PayrollProcessingStatus @default(DRAFT) @map("processing_status")
+  validatedAt        DateTime?               @map("validated_at") @db.Timestamptz
+  validatedBy        String?                 @map("validated_by") @db.Uuid
+  approvedAt         DateTime?               @map("approved_at") @db.Timestamptz
+  approvedBy         String?                 @map("approved_by") @db.Uuid
+  rejectedAt         DateTime?               @map("rejected_at") @db.Timestamptz
+  rejectedBy         String?                 @map("rejected_by") @db.Uuid
+  rejectionReason    String?                 @map("rejection_reason")
+  sentToBankAt       DateTime?               @map("sent_to_bank_at") @db.Timestamptz
+  sentToBankBy       String?                 @map("sent_to_bank_by") @db.Uuid
+  createdBy          String?                 @map("created_by") @db.Uuid
   updatedBy      String?             @map("updated_by") @db.Uuid
   createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz
@@ -913,11 +1012,19 @@ model PayrollLineItem {
 enum NotificationType {
   SUBMISSION
   APPROVAL_DECISION
+  REJECTION
   REVISION_REQUEST
   DEADLINE
   PAYROLL_READY
   AI_REPORT
   EMPLOYEE_APPROVAL_REQUEST
+  SCRUM_TASK_COMPLETED
+  SCRUM_ENTRY_LOCKED
+  SCRUM_BLOCKER_ADDED
+  DEPARTMENT_CHANGED
+  ROLE_CHANGED
+  ANNOUNCEMENT
+  PASSWORD_CHANGED
 
   @@map("notification_type")
 }
@@ -938,25 +1045,63 @@ enum NotificationStatus {
   @@map("notification_status")
 }
 
+/// Groups notifications for the Notification Center's category tabs. Some values
+/// (SCHEDULE, SECURITY, LEAVE, PERFORMANCE) have no publishing module yet — they
+/// exist so the UI/architecture is ready without a redesign once those modules ship.
+enum NotificationCategory {
+  DAILY_SCRUM
+  TIMESHEETS
+  PAYROLL
+  ACCOUNT
+  SYSTEM
+  SCHEDULE
+  SECURITY
+  LEAVE
+  PERFORMANCE
+
+  @@map("notification_category")
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+
+  @@map("notification_priority")
+}
+
 model Notification {
-  id        String              @id @default(uuid()) @db.Uuid
-  tenantId  String              @map("tenant_id") @db.Uuid
-  userId    String              @map("user_id") @db.Uuid
-  type      NotificationType
-  channel   NotificationChannel
-  status    NotificationStatus  @default(PENDING)
-  payload   Json                @default("{}")
-  createdBy String?             @map("created_by") @db.Uuid
-  updatedBy String?             @map("updated_by") @db.Uuid
-  createdAt DateTime            @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime            @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt DateTime?           @map("deleted_at") @db.Timestamptz
-  version   Int                 @default(0)
+  id             String               @id @default(uuid()) @db.Uuid
+  tenantId       String               @map("tenant_id") @db.Uuid
+  organizationId String               @map("organization_id") @db.Uuid
+  userId         String               @map("user_id") @db.Uuid
+  senderId       String?              @map("sender_id") @db.Uuid
+  type           NotificationType
+  category       NotificationCategory
+  priority       NotificationPriority @default(NORMAL)
+  channel        NotificationChannel
+  status         NotificationStatus   @default(PENDING)
+  title          String
+  message        String
+  actionUrl      String?              @map("action_url")
+  actionLabel    String?              @map("action_label")
+  metadata       Json                 @default("{}")
+  isRead         Boolean              @default(false) @map("is_read")
+  readAt         DateTime?            @map("read_at") @db.Timestamptz
+  isArchived     Boolean              @default(false) @map("is_archived")
+  createdBy      String?              @map("created_by") @db.Uuid
+  updatedBy      String?              @map("updated_by") @db.Uuid
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime?            @map("deleted_at") @db.Timestamptz
+  version        Int                  @default(0)
 
-  user User @relation(fields: [userId], references: [id])
+  user   User  @relation(fields: [userId], references: [id])
+  sender User? @relation("NotificationSender", fields: [senderId], references: [id])
 
-  @@index([tenantId, userId, status, createdAt(sort: Desc)])
-  @@index([tenantId, userId, type])
+  @@index([tenantId, userId, isRead, createdAt(sort: Desc)])
+  @@index([tenantId, userId, category])
+  @@index([tenantId, organizationId])
   @@map("notifications")
 }
 
@@ -1050,4 +1195,102 @@ model AiResult {
 
   @@index([tenantId, aiJobId])
   @@map("ai_results")
+}
+
+enum SecuritySeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum SecurityStatus {
+  SUCCESS
+  DENIED
+  PENDING
+}
+
+model SecurityLog {
+  id             String           @id @default(uuid()) @db.Uuid
+  tenantId       String           @map("tenant_id") @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  userId         String?          @map("user_id") @db.Uuid
+  action         String
+  status         SecurityStatus   @default(SUCCESS)
+  severity       SecuritySeverity @default(INFO)
+  ipAddress      String           @map("ip_address")
+  geoLocation    String?          @map("geo_location")
+  riskScore      Int              @default(0) @map("risk_score")
+  metadata       Json?            @map("metadata")
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([organizationId])
+  @@index([severity])
+  @@index([createdAt])
+  @@index([userId])
+  @@map("security_logs")
+}
+
+model SecurityAlert {
+  id             String           @id @default(uuid()) @db.Uuid
+  tenantId       String           @map("tenant_id") @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  title          String
+  description    String
+  severity       SecuritySeverity @default(HIGH)
+  status         String           @default("ACTIVE")
+  ipAddress      String?          @map("ip_address")
+  userId         String?          @map("user_id") @db.Uuid
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  resolvedAt     DateTime?        @map("resolved_at") @db.Timestamptz
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([organizationId])
+  @@index([severity])
+  @@index([createdAt])
+  @@index([userId])
+  @@map("security_alerts")
+}
+
+enum ReportCategory {
+  ATTENDANCE
+  PAYROLL
+  TIMESHEETS
+  LABOR_COST
+  COMPLIANCE
+  DEPARTMENT_ANALYTICS
+}
+
+enum ReportStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model GeneratedReport {
+  id             String         @id @default(uuid()) @db.Uuid
+  tenantId       String         @map("tenant_id") @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  name           String
+  category       ReportCategory
+  format         String         @default("PDF") // PDF, CSV, XLSX
+  dateRange      String?        @map("date_range")
+  status         ReportStatus   @default(PENDING)
+  filePath       String?        @map("file_path")
+  downloadCount  Int            @default(0) @map("download_count")
+  createdBy      String         @map("created_by") @db.Uuid
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  creator User @relation(fields: [createdBy], references: [id])
+
+  @@index([organizationId])
+  @@index([category])
+  @@index([createdAt])
+  @@map("generated_reports")
 }

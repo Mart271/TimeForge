@@ -44,8 +44,8 @@ export function RegisterStep1Form({ defaultValues, onNext }: Props) {
   return (
     <AuthCard>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-brand-navy">Create your account</h1>
-        <p className="mt-1 text-sm text-brand-muted">Step 1 of 2</p>
+        <h1 className="text-h2 text-brand-navy">Create your account</h1>
+        <p className="text-body mt-1 text-brand-muted">Step 1 of 2</p>
       </div>
 
       <form onSubmit={handleSubmit(onNext)} noValidate className="space-y-4">
@@ -111,7 +111,7 @@ export function RegisterStep1Form({ defaultValues, onNext }: Props) {
                   id="departmentId"
                   aria-label="Department"
                   aria-invalid={Boolean(errors.departmentId)}
-                  className="h-11 w-full rounded-[10px] border-[#c3c6d2]"
+                  className="h-11 w-full rounded-lg border-[#c3c6d2]"
                 >
                   <SelectValue placeholder={departmentsLoading ? "Loading…" : "Select..."} />
                 </SelectTrigger>
