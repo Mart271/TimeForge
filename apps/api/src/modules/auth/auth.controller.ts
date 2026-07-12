@@ -22,7 +22,12 @@ export class AuthController {
     res.cookie(REFRESH_COOKIE, token, {
       httpOnly: true,
       secure,
-      sameSite: 'strict',
+      // 'strict' blocks the cookie on every cross-site request, including the
+      // POST /auth/refresh call itself when frontend and backend are on
+      // different domains (e.g. Vercel + Railway) — 'none' is required for a
+      // cross-site cookie to be sent at all, and requires `secure: true`
+      // (already the case in production), which browsers enforce.
+      sameSite: secure ? 'none' : 'strict',
       maxAge: refreshTtl * 1000,
       path: REFRESH_PATH,
     });
