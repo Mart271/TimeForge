@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { PrivacyPolicyModal } from "./PrivacyPolicyModal";
 import { TermsModal } from "./TermsModal";
+import { SupportModal } from "./SupportModal";
 
 function LegalModals() {
   const searchParams = useSearchParams();
@@ -24,6 +25,7 @@ function LegalModals() {
     <>
       <PrivacyPolicyModal open={modal === "privacy"} onOpenChange={(open) => !open && close()} />
       <TermsModal open={modal === "terms"} onOpenChange={(open) => !open && close()} />
+      <SupportModal open={modal === "support"} onOpenChange={(open) => !open && close()} />
     </>
   );
 }
