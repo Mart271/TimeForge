@@ -160,7 +160,7 @@ export function RegisterStep1Form({ defaultValues, onNext }: Props) {
         <div className="border-t border-[#c3c6d2]/40 pt-4">
           <p className="text-center text-sm text-brand-muted">
             Having trouble?{" "}
-            <Link href="/support" className="font-semibold text-brand hover:underline">
+            <Link href="?modal=support" className="font-semibold text-brand hover:underline">
               Contact Support
             </Link>
           </p>

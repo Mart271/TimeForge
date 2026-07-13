@@ -17,7 +17,7 @@ export function AuthTopBar({ center, right }: AuthTopBarProps) {
         <div className="flex items-center gap-4 text-sm">
           {right ?? (
             <Link
-              href="/support"
+              href="?modal=support"
               className="flex h-9 items-center rounded-md border border-[#c3c6d2]/80 bg-white px-4 font-semibold text-brand-ink transition-colors hover:bg-[#f6f3f4]"
             >
               Support
