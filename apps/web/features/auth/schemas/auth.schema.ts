@@ -29,10 +29,10 @@ export const registerStep1Schema = z.object({
 });
 export type RegisterStep1Values = z.infer<typeof registerStep1Schema>;
 
-// Password policy shared by registration (backend RegisterDto enforces the same
-// rules — keep these in sync). Requires an upper- and lower-case letter and one
-// special character, on top of the 8–128 length bound.
-const strongPassword = z
+// Shared password policy (registration, password reset, change password).
+// Backend DTOs enforce the same rules — keep these in sync. Requires an upper-
+// and lower-case letter and one special character, on top of the 8–128 length.
+export const strongPassword = z
   .string()
   .min(8, "Password must be at least 8 characters")
   .max(128, "Password must be at most 128 characters")
@@ -65,10 +65,7 @@ export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 
 export const changePasswordSchema = z
   .object({
-    password: z
-      .string()
-      .min(8, "Password must be at least 8 characters")
-      .max(128, "Password must be at most 128 characters"),
+    password: strongPassword,
     confirmPassword: z.string().min(1, "Please confirm your password"),
   })
   .refine((data) => data.password === data.confirmPassword, {

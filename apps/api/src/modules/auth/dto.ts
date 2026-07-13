@@ -15,6 +15,13 @@ export class ForgotPasswordDto {
   email!: string;
 }
 
+// Registration, password reset, and change-password all require an uppercase
+// letter, a lowercase letter, and a special character. Kept in sync with the
+// frontend `strongPassword` schema (apps/web/features/auth/schemas/auth.schema.ts).
+export const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).+$/;
+export const STRONG_PASSWORD_MESSAGE =
+  'password must include an uppercase letter, a lowercase letter, and a special character';
+
 export class ResetPasswordDto {
   @IsString()
   token!: string;
@@ -22,6 +29,7 @@ export class ResetPasswordDto {
   @IsString()
   @MinLength(8)
   @MaxLength(128)
+  @Matches(STRONG_PASSWORD_REGEX, { message: STRONG_PASSWORD_MESSAGE })
   password!: string;
 }
 
@@ -37,12 +45,7 @@ export class RegisterDto {
   @IsString()
   @MinLength(8)
   @MaxLength(128)
-  // Must contain at least one lowercase letter, one uppercase letter, and one
-  // special (non-alphanumeric) character. Kept in sync with the frontend
-  // `strongPassword` schema (apps/web/features/auth/schemas/auth.schema.ts).
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).+$/, {
-    message: 'password must include an uppercase letter, a lowercase letter, and a special character',
-  })
+  @Matches(STRONG_PASSWORD_REGEX, { message: STRONG_PASSWORD_MESSAGE })
   password!: string;
 
   @IsString()
