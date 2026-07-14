@@ -6,6 +6,7 @@ import { SupabaseStorageProvider } from './providers/supabase-storage.provider';
 import { FileValidator } from './file-validator';
 import { UploadService } from './upload.service';
 import { StorageService } from './storage.service';
+import { StorageController } from './storage.controller';
 
 /**
  * Storage module — provider-swappable file storage. The active provider is
@@ -20,15 +21,16 @@ import { StorageService } from './storage.service';
       provide: STORAGE_PROVIDER,
       inject: [ConfigService],
       useFactory: (config: ConfigService): StorageProvider => {
-        const driver = config.get<{ driver: string }>('storage')?.driver ?? 'local';
-        return driver === 'supabase'
+        const storage = config.get<{ driver: string; publicUrl?: string }>('storage');
+        return storage?.driver === 'supabase'
           ? new SupabaseStorageProvider(config)
-          : new LocalStorageProvider();
+          : new LocalStorageProvider(storage?.publicUrl);
       },
     },
     StorageService,
     UploadService,
   ],
+  controllers: [StorageController],
   exports: [STORAGE_PROVIDER, StorageService, UploadService, FileValidator],
 })
 export class StorageModule {}
