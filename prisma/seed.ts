@@ -97,8 +97,39 @@ async function main() {
   await ensureUser('employee@demo.test', 'Eli', 'Employee', Role.EMPLOYEE, EmploymentType.EMPLOYEE, true);
   await ensureUser('intern@demo.test', 'Ivy', 'Intern', Role.EMPLOYEE, EmploymentType.INTERN, false);
   const supervisor = await ensureUser('supervisor@demo.test', 'Sam', 'Supervisor', Role.SUPERVISOR, EmploymentType.FULL_TIME, true);
-  await ensureUser('hr@demo.test', 'Hana', 'HumanResources', Role.HR, EmploymentType.FULL_TIME, true);
+  // Second supervisor in a different department — lets you demo department isolation
+  // (Marketing supervisor must not see/act on Engineering scrum, and vice-versa).
+  const supervisor2 = await ensureUser('supervisor2@demo.test', 'Mira', 'Marketing', Role.SUPERVISOR, EmploymentType.FULL_TIME, true);
+  const marketingEmployee = await ensureUser('marketing@demo.test', 'Marco', 'Marketer', Role.EMPLOYEE, EmploymentType.EMPLOYEE, true);
+  const hr = await ensureUser('hr@demo.test', 'Hana', 'HumanResources', Role.HR, EmploymentType.FULL_TIME, true);
   await ensureUser('finance@demo.test', 'Finn', 'Finance', Role.FINANCE, EmploymentType.FULL_TIME, true);
+
+  // ── Pending registration (for testing the approval modal) ──────────────────
+  const pendingEmail = 'pending@demo.test';
+  const pendingUser =
+    (await prisma.user.findFirst({ where: { tenantId: tenant.id, email: pendingEmail, deletedAt: null } })) ??
+    (await prisma.user.create({
+      data: {
+        tenantId: tenant.id,
+        organizationId: org.id,
+        email: pendingEmail,
+        firstName: 'Parker',
+        lastName: 'Pending',
+        passwordHash,
+        status: UserStatus.PENDING,
+        isApproved: false,
+        employmentType: EmploymentType.EMPLOYEE,
+        payrollEligible: true,
+      },
+    }));
+  const employeeRole = await prisma.role.findFirstOrThrow({
+    where: { tenantId: tenant.id, key: Role.EMPLOYEE, deletedAt: null },
+  });
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: pendingUser.id, roleId: employeeRole.id } },
+    update: {},
+    create: { userId: pendingUser.id, roleId: employeeRole.id },
+  });
 
   // ── Organization settings (centralized config) ─────────────────────────────
   const settings: { key: string; value: unknown; type: string }[] = [
@@ -154,16 +185,35 @@ async function main() {
   const engineeringDept =
     (await prisma.department.findFirst({ where: { tenantId: tenant.id, organizationId: org.id, name: 'Engineering', deletedAt: null } })) ??
     (await prisma.department.create({
-      data: { tenantId: tenant.id, organizationId: org.id, name: 'Engineering', createdBy: admin.id, updatedBy: admin.id },
+      data: { tenantId: tenant.id, organizationId: org.id, name: 'Engineering', managerId: supervisor.id, createdBy: admin.id, updatedBy: admin.id },
     }));
-  if (!(await prisma.department.findFirst({ where: { tenantId: tenant.id, organizationId: org.id, name: 'Human Resources', deletedAt: null } }))) {
-    await prisma.department.create({
-      data: { tenantId: tenant.id, organizationId: org.id, name: 'Human Resources', createdBy: admin.id, updatedBy: admin.id },
-    });
-  }
+  // Ensure supervisor is set as Engineering department head (in case dept already existed without one).
+  await prisma.department.updateMany({
+    where: { id: engineeringDept.id, managerId: null, deletedAt: null },
+    data: { managerId: supervisor.id, updatedBy: admin.id },
+  });
 
-  // Assign demo staff to Engineering so profile-driven fields (e.g. the
-  // Daily Scrum "Department" auto-fill) have data out of the box.
+  const hrDept =
+    (await prisma.department.findFirst({ where: { tenantId: tenant.id, organizationId: org.id, name: 'Human Resources', deletedAt: null } })) ??
+    (await prisma.department.create({
+      data: { tenantId: tenant.id, organizationId: org.id, name: 'Human Resources', managerId: hr.id, createdBy: admin.id, updatedBy: admin.id },
+    }));
+  await prisma.department.updateMany({
+    where: { id: hrDept.id, managerId: null, deletedAt: null },
+    data: { managerId: hr.id, updatedBy: admin.id },
+  });
+
+  const marketingDept =
+    (await prisma.department.findFirst({ where: { tenantId: tenant.id, organizationId: org.id, name: 'Marketing', deletedAt: null } })) ??
+    (await prisma.department.create({
+      data: { tenantId: tenant.id, organizationId: org.id, name: 'Marketing', managerId: supervisor2.id, createdBy: admin.id, updatedBy: admin.id },
+    }));
+  await prisma.department.updateMany({
+    where: { id: marketingDept.id, managerId: null, deletedAt: null },
+    data: { managerId: supervisor2.id, updatedBy: admin.id },
+  });
+
+  // Assign demo staff to their departments.
   await prisma.user.updateMany({
     where: {
       tenantId: tenant.id,
@@ -171,6 +221,28 @@ async function main() {
       departmentId: null,
     },
     data: { departmentId: engineeringDept.id },
+  });
+  await prisma.user.updateMany({
+    where: {
+      tenantId: tenant.id,
+      email: 'hr@demo.test',
+      departmentId: null,
+    },
+    data: { departmentId: hrDept.id },
+  });
+  await prisma.user.updateMany({
+    where: {
+      tenantId: tenant.id,
+      email: { in: ['supervisor2@demo.test', 'marketing@demo.test'] },
+      departmentId: null,
+    },
+    data: { departmentId: marketingDept.id },
+  });
+  // Point the Marketing employee's supervisor reference at the Marketing head
+  // (matches phase-2 approval/transfer behaviour; drives "notify my supervisor").
+  await prisma.user.updateMany({
+    where: { tenantId: tenant.id, email: 'marketing@demo.test', supervisorId: null },
+    data: { supervisorId: supervisor2.id },
   });
 
   // Team
@@ -248,7 +320,9 @@ async function main() {
   console.log('✓ Seed complete (Phase 6).');
   console.log('  Tenant: demo   Org: demo-org (Asia/Manila)');
   console.log('  Login:  admin@demo.test / ChangeMe123!  (also employee@, intern@, supervisor@, hr@, finance@)');
-  console.log('  Dept: Engineering | Team: Backend | Client: ACME | Project: TF-2026 | 3 Work Categories | 3 Holidays');
+  console.log('  Depts:  supervisor@demo.test → Engineering   |   supervisor2@demo.test → Marketing (marketing@demo.test is their report)');
+  console.log('  Pending: pending@demo.test / ChangeMe123!  (for testing approval modal)');
+  console.log('  Dept: Engineering + Marketing | Team: Backend | Client: ACME | Project: TF-2026 | 3 Work Categories | 3 Holidays');
 }
 
 main()

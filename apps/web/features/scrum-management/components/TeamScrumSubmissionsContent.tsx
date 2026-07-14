@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, Calendar, AlertCircle, MessageSquare, Flag, Loader2, ChevronLeft, ChevronRight, Check } from "lucide-react";
-import { getTeamScrums, postScrumComment, postScrumFlag } from "../api/scrum-management.service";
+import { Search, Calendar, AlertCircle, MessageSquare, Flag, Loader2, ChevronLeft, ChevronRight, Check, Lock, LockOpen } from "lucide-react";
+import { getTeamScrums, postScrumComment, postScrumFlag, postScrumUnlock } from "../api/scrum-management.service";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { Avatar } from "@/components/shared/Avatar";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -20,6 +20,10 @@ export function TeamScrumSubmissionsContent() {
 
   // Comments local state map: entryId -> text
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+
+  // Unlock modal: the entry being unlocked + the optional reason draft.
+  const [unlockTarget, setUnlockTarget] = useState<{ id: string; name: string } | null>(null);
+  const [unlockReason, setUnlockReason] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["scrum-team-submissions", { search, date, hasBlockers, page }],
@@ -53,6 +57,19 @@ export function TeamScrumSubmissionsContent() {
     },
     onError: (err: any) => {
       setToast({ message: err?.message || "Failed to flag entry", tone: "error" });
+    },
+  });
+
+  const unlockMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) => postScrumUnlock(id, reason),
+    onSuccess: () => {
+      setToast({ message: "Today's Commitment unlocked", tone: "success" });
+      setUnlockTarget(null);
+      setUnlockReason("");
+      queryClient.invalidateQueries({ queryKey: ["scrum-team-submissions"] });
+    },
+    onError: (err: any) => {
+      setToast({ message: err?.message || "Failed to unlock commitment", tone: "error" });
     },
   });
 
@@ -139,6 +156,12 @@ export function TeamScrumSubmissionsContent() {
                     <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
                       <AlertCircle className="h-3 w-3" />
                       Recurring Blocker
+                    </span>
+                  ) : null}
+                  {item.isLocked ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                      <Lock className="h-3 w-3" />
+                      Locked
                     </span>
                   ) : null}
                   <StatusBadge
@@ -253,19 +276,35 @@ export function TeamScrumSubmissionsContent() {
                         Post Comment
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => flagMutation.mutate({ id: item.id, version: item.version })}
-                        disabled={flagMutation.isPending || item.status === "BLOCKED"}
-                        className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50/50 px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
-                      >
-                        {flagMutation.isPending ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Flag className="h-3.5 w-3.5" />
-                        )}
-                        Flag Recurring Issue
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {item.isLocked ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUnlockTarget({ id: item.id, name: `${item.user.firstName} ${item.user.lastName}` });
+                              setUnlockReason("");
+                            }}
+                            className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100"
+                          >
+                            <LockOpen className="h-3.5 w-3.5" />
+                            Unlock Commitment
+                          </button>
+                        ) : null}
+
+                        <button
+                          type="button"
+                          onClick={() => flagMutation.mutate({ id: item.id, version: item.version })}
+                          disabled={flagMutation.isPending || item.status === "BLOCKED"}
+                          className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50/50 px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                        >
+                          {flagMutation.isPending ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Flag className="h-3.5 w-3.5" />
+                          )}
+                          Flag Recurring Issue
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -308,6 +347,55 @@ export function TeamScrumSubmissionsContent() {
       ) : null}
 
       <RecurringIssuesPanel />
+
+      {/* Unlock Commitment modal */}
+      {unlockTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex items-center gap-2 text-amber-700">
+              <LockOpen className="h-5 w-5" />
+              <h3 className="text-lg font-semibold text-brand-navy">Unlock Today&apos;s Commitment</h3>
+            </div>
+            <p className="mt-2 text-sm text-brand-muted">
+              This lets <span className="font-semibold text-brand-navy">{unlockTarget.name}</span> edit their locked
+              commitment again. They&apos;ll be notified, and this action is recorded in the audit log.
+            </p>
+
+            <label className="mt-4 block text-sm font-semibold text-brand-navy">Reason (optional)</label>
+            <textarea
+              value={unlockReason}
+              onChange={(e) => setUnlockReason(e.target.value)}
+              placeholder="e.g. Plan needs revision after scope change"
+              className="mt-1.5 w-full rounded-lg border border-[#c3c6d2] p-2.5 text-sm outline-none focus:border-brand min-h-[80px]"
+            />
+
+            <div className="mt-5 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setUnlockTarget(null);
+                  setUnlockReason("");
+                }}
+                disabled={unlockMutation.isPending}
+                className="rounded-lg border border-[#c3c6d2] px-4 py-2 text-sm font-semibold text-brand-navy hover:bg-[#f5f6fa] disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  unlockMutation.mutate({ id: unlockTarget.id, reason: unlockReason.trim() || undefined })
+                }
+                disabled={unlockMutation.isPending}
+                className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                {unlockMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockOpen className="h-4 w-4" />}
+                Unlock
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>

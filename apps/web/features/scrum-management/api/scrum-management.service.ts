@@ -149,3 +149,8 @@ export async function postScrumComment(id: string, comment: string, version: num
 export async function postScrumFlag(id: string, version: number): Promise<void> {
   await apiClient.post(`/scrum/${id}/flag`, { version });
 }
+
+/** Supervisor unlocks a team member's locked Today's Commitment so they can edit it again. */
+export async function postScrumUnlock(id: string, reason?: string): Promise<void> {
+  await apiClient.post(`/scrum/${id}/unlock`, reason ? { reason } : {});
+}

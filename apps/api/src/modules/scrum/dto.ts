@@ -104,6 +104,14 @@ export class CommentScrumEntryDto {
   version!: number;
 }
 
+export class UnlockScrumEntryDto {
+  /** Optional reason the supervisor is unlocking the locked commitment. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  reason?: string;
+}
+
 export interface ScrumQuery {
   limit?: string;
   cursor?: string;

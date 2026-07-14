@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, ParseIntPipe, ParseUUIDPipe, Po
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ScrumService, ScrumBlockersQuery, ScrumMgmtQuery } from './scrum.service';
 import { AuthPrincipal, CurrentUser } from '../../common/decorators';
-import { CommentScrumEntryDto, ScrumQuery } from './dto';
+import { CommentScrumEntryDto, ScrumQuery, UnlockScrumEntryDto } from './dto';
 
 /**
  * Daily Scrum Management dashboard — Supervisor (team scope) / Admin (org scope).
@@ -79,6 +79,17 @@ export class ScrumDashboardController {
     @Body() dto: CommentScrumEntryDto,
   ) {
     return this.svc.comment(u, id, dto);
+  }
+
+  @Post(':id/unlock')
+  @HttpCode(200)
+  @ApiOperation({ summary: "Unlock a team member's locked Today's Commitment (Supervisor / Admin)" })
+  unlock(
+    @CurrentUser() u: AuthPrincipal,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UnlockScrumEntryDto,
+  ) {
+    return this.svc.unlockEntry(u, id, dto);
   }
 
   @Post(':id/flag')
