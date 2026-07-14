@@ -18,6 +18,7 @@ import {
   CreateScrumEntryDto,
   CreateScrumTaskDto,
   ScrumQuery,
+  UnlockScrumEntryDto,
   UpdateScrumBlockerDto,
   UpdateScrumEntryDto,
   UpdateScrumTaskDto,
@@ -202,6 +203,71 @@ export class ScrumService {
       message: 'Your supervisor left feedback on your recent daily scrum entry.',
       actionUrl: '/time-tracking',
       actionLabel: 'View Scrum',
+    });
+
+    return updated;
+  }
+
+  /**
+   * Supervisor unlocks a team member's locked Today's Commitment so the
+   * employee/intern can edit their scrum tasks again. Department-scoped: only the
+   * head of the entry owner's department (or an admin) may unlock. Audited, and
+   * the employee is notified. Optionally records the supervisor's unlock reason.
+   */
+  async unlockEntry(p: AuthPrincipal, id: string, dto: UnlockScrumEntryDto): Promise<ScrumEntry> {
+    const entry = await this.prisma.scrumEntry.findFirst({
+      where: { id, tenantId: p.tenantId, organizationId: p.organizationId, deletedAt: null },
+    });
+    if (!entry) throw new NotFoundException('Scrum entry not found');
+
+    if (!this.can(p, PERMISSIONS.SCRUM_READ_TEAM)) {
+      throw new ForbiddenException('Only supervisors can unlock team scrum entries');
+    }
+
+    // Department isolation: the entry owner must be within the supervisor's scope.
+    if (!(await this.isInTeam(p, entry.userId))) {
+      throw new ForbiddenException('This entry is outside your team');
+    }
+
+    if (!entry.isLocked) {
+      throw new ConflictException('This scrum entry is not locked');
+    }
+
+    const reason = dto.reason?.trim() || null;
+
+    const updated = await this.prisma.scrumEntry.update({
+      where: { id },
+      data: {
+        isLocked: false,
+        updatedBy: p.userId,
+        version: { increment: 1 },
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId: p.tenantId,
+        actorId: p.userId,
+        action: 'ADMIN_ACTION',
+        entityType: 'ScrumEntry',
+        entityId: id,
+        metadata: { event: 'SCRUM_ENTRY_UNLOCKED', reason },
+      },
+    });
+
+    await this.notifications.create({
+      tenantId: p.tenantId,
+      organizationId: p.organizationId,
+      userId: entry.userId,
+      senderId: p.userId,
+      type: 'ANNOUNCEMENT',
+      category: 'DAILY_SCRUM',
+      title: "Today's Commitment unlocked",
+      message: reason
+        ? `Your supervisor unlocked today's commitment so you can edit it again. Reason: ${reason}`
+        : "Your supervisor unlocked today's commitment so you can edit it again.",
+      actionUrl: '/time-tracking',
+      actionLabel: 'Edit Scrum',
     });
 
     return updated;
