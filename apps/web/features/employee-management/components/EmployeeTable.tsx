@@ -77,6 +77,13 @@ export function EmployeeTable({ isAdmin, onToast }: { isAdmin: boolean; onToast:
 
   const { data: departments } = useQuery({ queryKey: ["auth", "departments"], queryFn: fetchDepartments });
 
+  // base-ui Select renders the raw `value` in the trigger unless given `items`
+  // to map value → label; without this the department filter shows the UUID.
+  const departmentItems = [
+    { value: "ALL", label: "All Departments" },
+    ...(departments?.map((d) => ({ value: d.id, label: d.name })) ?? []),
+  ];
+
   const query = {
     q: search || undefined,
     status: status === "ALL" ? undefined : status,
@@ -194,7 +201,7 @@ export function EmployeeTable({ isAdmin, onToast }: { isAdmin: boolean; onToast:
           </div>
           <div className="flex-1 min-w-[170px]">
             <label className="mb-1 block text-xs font-semibold text-brand-muted">Department</label>
-            <Select value={departmentId} onValueChange={(v) => setDepartmentId(v ?? "ALL")}>
+            <Select value={departmentId} onValueChange={(v) => setDepartmentId(v ?? "ALL")} items={departmentItems}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">All Departments</SelectItem>

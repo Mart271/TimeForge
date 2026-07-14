@@ -8,6 +8,9 @@ const config: Config = {
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: '.',
   testRegex: '.*\\.spec\\.ts$',
+  // Ignore stale git worktrees under .claude/worktrees — they duplicate spec
+  // files and pollute the run (double-counted suites, masked failures).
+  testPathIgnorePatterns: ['/node_modules/', '/.claude/', '/dist/'],
   transform: {
     '^.+\\.(t|j)s$': ['ts-jest', {
       tsconfig: 'tsconfig.test.json',

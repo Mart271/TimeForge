@@ -36,18 +36,17 @@ export function AiInsightCard({ userId }: { userId: string }) {
   const isWorking = job ? job.status === "QUEUED" || job.status === "RUNNING" : trigger.isPending;
 
   return (
-    <SectionCard
-      title="AI Insights"
-      className="bg-brand text-white [&_h3]:text-white"
-    >
-      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-white/70">
-        <Sparkles className="h-4 w-4" aria-hidden="true" />
+    <SectionCard title="AI Insights">
+      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-brand">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand/10 text-brand">
+          <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+        </span>
         Team Health Advisory
       </div>
 
       {!jobId ? (
         <div className="flex flex-col gap-3">
-          <p className="text-sm text-white/80">
+          <p className="text-sm text-brand-muted">
             Generate a real AI advisory over your team&apos;s recent timesheets and scrum blockers.
           </p>
           <Button
@@ -57,40 +56,40 @@ export function AiInsightCard({ userId }: { userId: string }) {
               trigger.mutate();
             }}
             disabled={trigger.isPending}
-            className="w-fit bg-white text-brand hover:bg-white/90"
+            className="w-fit"
           >
             {trigger.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}
             Generate Insight
           </Button>
           {trigger.isError ? (
-            <p className="text-sm text-red-200">
+            <p className="text-sm text-red-600">
               {trigger.error instanceof ApiError ? trigger.error.message : "Couldn't start the AI job."}
             </p>
           ) : null}
         </div>
       ) : isWorking ? (
-        <div className="flex items-center gap-2 text-sm text-white/80">
+        <div className="flex items-center gap-2 text-sm text-brand-muted">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
           Analyzing team activity…
         </div>
       ) : job?.status === "FAILED" ? (
         <div className="flex flex-col gap-2">
-          <p className="text-sm text-red-200">Insight generation failed{job.errorMsg ? `: ${job.errorMsg}` : "."}</p>
-          <Button type="button" size="sm" onClick={() => { setJobId(null); }} className="w-fit bg-white text-brand hover:bg-white/90">
+          <p className="text-sm text-red-600">Insight generation failed{job.errorMsg ? `: ${job.errorMsg}` : "."}</p>
+          <Button type="button" size="sm" onClick={() => { setJobId(null); }} className="w-fit">
             Try Again
           </Button>
         </div>
       ) : result ? (
         <div className="flex flex-col gap-3">
-          <p className="text-sm leading-relaxed text-white">{result.summary}</p>
-          <div className="border-t border-white/20 pt-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-white/70">Recommendation</p>
-            <p className="mt-1 text-sm text-white">{result.recommendation}</p>
+          <p className="text-sm leading-relaxed text-brand-navy">{result.summary}</p>
+          <div className="border-t border-brand-navy/10 pt-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-brand">Recommendation</p>
+            <p className="mt-1 text-sm text-brand-navy">{result.recommendation}</p>
           </div>
-          <p className="text-xs text-white/60">Confidence: {Math.round(result.confidence * 100)}%</p>
+          <p className="text-xs text-brand-muted">Confidence: {Math.round(result.confidence * 100)}%</p>
         </div>
       ) : (
-        <div className="flex items-center gap-2 text-sm text-white/80">
+        <div className="flex items-center gap-2 text-sm text-brand-muted">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
           Loading result…
         </div>

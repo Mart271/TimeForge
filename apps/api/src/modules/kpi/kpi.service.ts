@@ -416,6 +416,8 @@ export class KpiService {
         category: 'PERFORMANCE',
         title: 'New Coaching remarks',
         message: 'Your supervisor left new performance coaching feedback for you.',
+        actionUrl: '/performance',
+        actionLabel: 'View Feedback',
         channel: 'IN_APP',
       },
     });
