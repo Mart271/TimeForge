@@ -15,6 +15,7 @@ type DepartmentWithRelations = Prisma.DepartmentGetPayload<{ include: typeof DEP
 interface DepartmentCounts {
   employeeCount: number;
   internCount: number;
+  otherCount: number;
 }
 
 function shapeDepartment(dept: DepartmentWithRelations, counts?: DepartmentCounts) {
@@ -26,6 +27,7 @@ function shapeDepartment(dept: DepartmentWithRelations, counts?: DepartmentCount
     // Active headcount split by employment type (excludes soft-deleted).
     employeeCount: counts?.employeeCount ?? 0,
     internCount: counts?.internCount ?? 0,
+    otherCount: counts?.otherCount ?? 0,
   };
 }
 
@@ -54,9 +56,10 @@ export class DepartmentsService {
     });
     for (const row of grouped) {
       if (!row.departmentId) continue;
-      const entry = result.get(row.departmentId) ?? { employeeCount: 0, internCount: 0 };
+      const entry = result.get(row.departmentId) ?? { employeeCount: 0, internCount: 0, otherCount: 0 };
       if (row.employmentType === 'INTERN') entry.internCount += row._count._all;
-      else entry.employeeCount += row._count._all;
+      else if (row.employmentType === 'EMPLOYEE') entry.employeeCount += row._count._all;
+      else entry.otherCount += row._count._all;
       result.set(row.departmentId, entry);
     }
     return result;
@@ -80,7 +83,10 @@ export class DepartmentsService {
   async findOne(tenantId: string, orgId: string, id: string) {
     const item = await this.prisma.department.findFirst({
       where: { id, tenantId, organizationId: orgId, deletedAt: null },
-      include: DEPARTMENT_INCLUDE,
+      include: {
+        ...DEPARTMENT_INCLUDE,
+        _count: { select: { users: true, projects: true } },
+      },
     });
     if (!item) throw new NotFoundException('Department not found');
     const counts = await this.countsByDepartment(tenantId, orgId, [id]);

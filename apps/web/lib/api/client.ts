@@ -31,6 +31,11 @@ export const apiClient = axios.create({
 // In-memory access token, set by the AuthProvider on login. Kept out of
 // localStorage on purpose; the refresh token stays in an httpOnly cookie.
 let accessToken: string | null = null;
+// Body-based refresh token fallback — when the browser blocks cross-site
+// cookies (e.g. Safari ITP), the cookie isn't sent and the refresh fails.
+// Storing the refresh token in memory and sending it in the request body
+// works around this. The httpOnly cookie remains the primary mechanism.
+let refreshTokenMemory: string | null = null;
 
 // Body-based refresh token fallback — when the browser blocks cross-site
 // cookies (e.g. Safari ITP with frontend and backend on different domains),
