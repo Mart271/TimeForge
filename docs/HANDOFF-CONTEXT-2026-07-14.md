@@ -8,39 +8,45 @@
 
 ## 0. TL;DR — where things stand
 
-- Branch in play: **`feat/department-supervision-phase3`** (this is the most up-to-date branch; `main` is BEHIND it).
+- Branch in play: **`feat/department-supervision-phase3`** (most up-to-date; `main` is slightly behind — see §1).
 - Feature work is **done**. Remaining work is **QA hardening + the email system (infra) + a live browser QA pass**.
 - The **email problem is infrastructure/config, NOT code** — see §4. This is the #1 production blocker.
 - Browser pane in this environment is **flaky** (React login page intermittently won't hydrate → screenshots time out, form does native GET). API-level verification is reliable and authoritative for most checks.
+- **Next git action: merge OPEN PR #35** (QA fixes + this doc). PR #34 is already merged.
 
 ---
 
-## 1. Git state (CRITICAL — read carefully)
+## 1. Git state (CRITICAL — read carefully) — updated after PR #34 merge
 
-Current branch: `feat/department-supervision-phase3`
+Current branch: `feat/department-supervision-phase3` (pushed, tip `6fb913a`).
 
-Local commits ahead of `origin/main`, newest first:
+Commits and where they live now, newest first:
 ```
-3d0787d  fix(qa): HR sidebar scope, employee-list department name, strip user secrets   <-- NOT pushed
-472d2a4  feat(scrum): require unlock reason; fix admin org-wide unlock access            <-- pushed, in PR #34 (OPEN)
-85dbe19  feat(scrum): supervisor unlock of Today's Commitment + Marketing demo dept      <-- merged to main via PR #33
-64bc4b2  feat(seed): assign department heads
-77cec65  feat(seed): pending@demo.test account
+6fb913a  docs: session handoff context (this file)                                   <-- OPEN PR #35
+3d0787d  fix(qa): HR sidebar scope, employee-list department name, strip user secrets <-- OPEN PR #35
+472d2a4  feat(scrum): require unlock reason; fix admin org-wide unlock access         <-- MERGED to main (PR #34)
+85dbe19  feat(scrum): supervisor unlock of Today's Commitment + Marketing demo dept    <-- MERGED to main (PR #33)
 ```
 
-### What is / isn't on `main`
-- `main` HEAD = `32b6fe8` (merge of PR #33) → contains ONLY up to `85dbe19`.
-- **`472d2a4` (mandatory unlock reason + admin org-wide unlock fix) is NOT on main** → it's in **open PR #34** (`feat(scrum): mandatory unlock reason + admin org-wide unlock fix`). MERGE THIS.
-- **`3d0787d` (HR sidebar + dept-name + security fix) is committed locally but NOT pushed.** Needs `git push origin feat/department-supervision-phase3`, then it joins PR #34 (same branch/head).
+### What IS on `main` now
+- ✅ Supervisor unlock feature (PR #33).
+- ✅ Mandatory unlock reason + admin org-wide unlock fix (PR #34, merged).
+
+### What is NOT on `main` yet (all in OPEN PR #35)
+- ❌ HR sidebar scope fix (QA #24/#35)
+- ❌ Employee-list department name (QA #31/#33/#36)
+- ❌ **Security: stripped leaked reset/verify tokens from `/users`**
+- ❌ This handoff doc
 
 ### Action items for git
-1. `git push origin feat/department-supervision-phase3` (pushes `3d0787d`).
-2. Merge **PR #34** to main (brings `472d2a4` + `3d0787d`).
-3. Optional cleanup: delete stale merged branches (see §9).
+1. **Merge OPEN PR #35** → https://github.com/marktagabstartuplab-ui/TimeForge/pull/35 (brings `3d0787d` + `6fb913a` to main). This is the only outstanding git task.
+2. Optional cleanup: delete stale merged branches (see §9).
+
+> Note: a Claude Code guardrail blocks the agent from self-merging its own PRs to main, so a human must click Merge on #35.
 
 ### GitHub
 - Repo: `marktagabstartuplab-ui/TimeForge` (origin). `gh` authed as `Mart271`.
-- PR #33 = MERGED (unlock v1). PR #34 = OPEN (unlock hardening + qa fixes on same branch).
+- PR #33 = MERGED (unlock v1). PR #34 = MERGED (unlock hardening). **PR #35 = OPEN** (QA fixes + this doc).
 
 ---
 
@@ -202,8 +208,8 @@ Do NOT delete `feat/department-supervision-phase1` (tip not ancestor of main) or
 ---
 
 ## 11. Remaining work queue (priority order for next session)
-1. **Email (infra)** — verify Railway env + Supabase edge fn secrets; test edge fn via curl (§4). Highest priority.
-2. **Push `3d0787d` + merge PR #34** so main is current.
+1. **Merge OPEN PR #35** so the QA fixes + security fix reach main (see §1).
+2. **Email (infra)** — verify Railway env + Supabase edge fn secrets; test edge fn via curl (§4). Highest-priority PRODUCT blocker.
 3. **Notification action URLs (#29)** — quick code fix (§6).
 4. **Live browser QA** of Daily-Scrum/EOD cluster (#13,15,16,26), Leave attachments (upload/preview/download), and per-role smoke tests — needs a working browser (this session's pane was flaky; try a fresh session / real Chrome).
 5. **Minor/cosmetic**: #20, #21, #22, #25.
