@@ -72,7 +72,7 @@ export function ProfessionalDetailsCard({
         <div>
           <Label className="mb-1.5">Department</Label>
           {isEditing && onDepartmentChange ? (
-            <Select value={selectedDepartmentId ?? me.departmentId ?? "NONE"} onValueChange={(v) => onDepartmentChange(v === "NONE" ? "" : v)}>
+            <Select value={selectedDepartmentId ?? me.departmentId ?? "NONE"} onValueChange={(v) => onDepartmentChange(v === "NONE" || v === null ? "" : v)}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="NONE">No department</SelectItem>
@@ -99,7 +99,7 @@ export function ProfessionalDetailsCard({
         <div>
           <Label className="mb-1.5">Employment Type</Label>
           {isEditing && onEmploymentTypeChange ? (
-            <Select value={selectedEmploymentType ?? me.employmentType} onValueChange={onEmploymentTypeChange}>
+            <Select value={selectedEmploymentType ?? me.employmentType} onValueChange={(v) => onEmploymentTypeChange(v ?? "")}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {EMPLOYMENT_TYPES.map((et) => (
@@ -119,7 +119,7 @@ export function ProfessionalDetailsCard({
         <div>
           <Label className="mb-1.5">Supervisor</Label>
           {isEditing && onSupervisorChange ? (
-            <Select value={selectedSupervisorId ?? me.supervisor?.id ?? "NONE"} onValueChange={(v) => onSupervisorChange(v === "NONE" ? "" : v)}>
+            <Select value={selectedSupervisorId ?? me.supervisor?.id ?? "NONE"} onValueChange={(v) => onSupervisorChange(v === "NONE" || v === null ? "" : v)}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="NONE">No supervisor</SelectItem>

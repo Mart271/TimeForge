@@ -312,7 +312,7 @@ export function AccountApprovalsContent() {
           <div className="flex flex-col gap-4 px-6 py-5">
             <div>
               <Label className="mb-1.5">Department</Label>
-              <Select value={approveDept || "NONE"} onValueChange={(v) => setApproveDept(v === "NONE" ? "" : v)}>
+              <Select value={approveDept || "NONE"} onValueChange={(v) => setApproveDept(v === "NONE" || v === null ? "" : v)}>
                 <SelectTrigger className="w-full"><SelectValue placeholder="Select department" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="NONE">No department</SelectItem>
@@ -325,7 +325,7 @@ export function AccountApprovalsContent() {
 
             <div>
               <Label className="mb-1.5">Employment Type</Label>
-              <Select value={approveEmploymentType || "EMPLOYEE"} onValueChange={(v) => setApproveEmploymentType(v)}>
+              <Select value={approveEmploymentType || "EMPLOYEE"} onValueChange={(v) => setApproveEmploymentType(v ?? "EMPLOYEE")}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {EMPLOYMENT_TYPES.map((et) => (
@@ -337,7 +337,7 @@ export function AccountApprovalsContent() {
 
             <div>
               <Label className="mb-1.5">Role</Label>
-              <Select value={approveRole || "EMPLOYEE"} onValueChange={(v) => setApproveRole(v)}>
+              <Select value={approveRole || "EMPLOYEE"} onValueChange={(v) => setApproveRole(v ?? "EMPLOYEE")}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {ROLES.map((r) => (
