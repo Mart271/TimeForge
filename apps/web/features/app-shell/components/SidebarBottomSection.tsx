@@ -1,23 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Bell, Settings, LogOut } from "lucide-react";
+import { Settings, LogOut } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
-import { useNotificationCenterStore } from "@/features/notifications/store/notification-center.store";
 import { logout } from "@/features/auth/api/auth.service";
 import { useSidebarStore } from "../store/sidebar.store";
 
-interface SidebarBottomSectionProps {
-  unreadNotifications: number;
-}
-
-export function SidebarBottomSection({ unreadNotifications }: SidebarBottomSectionProps) {
+export function SidebarBottomSection() {
   const router = useRouter();
   const { clearSession } = useAuth();
   const isCollapsed = useSidebarStore((s) => s.isCollapsed);
-  const openNotifications = useNotificationCenterStore((s) => s.open);
 
   const handleLogout = async () => {
     try {
@@ -28,14 +22,9 @@ export function SidebarBottomSection({ unreadNotifications }: SidebarBottomSecti
     }
   };
 
+  // Notifications intentionally omitted here — it lives in the top-bar bell (and
+  // the account menu) so it isn't duplicated in the sidebar.
   const items = [
-    {
-      id: "notifications",
-      label: "Notifications",
-      icon: Bell,
-      badge: unreadNotifications,
-      onClick: openNotifications,
-    },
     {
       id: "settings",
       label: "Settings",
@@ -77,25 +66,9 @@ export function SidebarBottomSection({ unreadNotifications }: SidebarBottomSecti
                 )}
                 aria-hidden="true"
               />
-              {/* Badge dot for collapsed mode */}
-              {"badge" in item && item.badge > 0 && isCollapsed ? (
-                <span
-                  className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500"
-                  aria-hidden="true"
-                />
-              ) : null}
             </div>
 
-            {!isCollapsed ? (
-              <>
-                <span className="min-w-0 truncate">{item.label}</span>
-                {"badge" in item && item.badge > 0 ? (
-                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
-                    {item.badge > 99 ? "99+" : item.badge}
-                  </span>
-                ) : null}
-              </>
-            ) : null}
+            {!isCollapsed ? <span className="min-w-0 truncate">{item.label}</span> : null}
           </div>
         );
 
@@ -123,7 +96,6 @@ export function SidebarBottomSection({ unreadNotifications }: SidebarBottomSecti
               />
               <TooltipContent side="right" sideOffset={8}>
                 {item.label}
-                {"badge" in item && item.badge > 0 ? ` (${item.badge})` : ""}
               </TooltipContent>
             </Tooltip>
           );

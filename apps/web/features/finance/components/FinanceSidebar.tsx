@@ -52,14 +52,13 @@ export function FinanceSidebar() {
         </nav>
 
         <div className="shrink-0">
-          <SidebarBottomSection unreadNotifications={0} />
+          <SidebarBottomSection />
         </div>
       </aside>
 
       <SidebarMobileDrawer
         sidebarData={{ workspace: { name: "TimeForge" }, organization: orgData, user: { id: "", firstName: "", lastName: "", roles: [] }, menu: FINANCE_NAV_ITEMS }}
         sections={sections}
-        unreadNotifications={0}
         homeHref="/finance/dashboard"
       />
     </>
