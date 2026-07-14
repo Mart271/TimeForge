@@ -13,7 +13,6 @@ import type { SidebarResponse, SidebarMenuItem } from "../api/navigation.service
 interface SidebarMobileDrawerProps {
   sidebarData: SidebarResponse | null;
   sections: { section: string; items: SidebarMenuItem[] }[];
-  unreadNotifications: number;
   /** Where the logo links — defaults to the generic dashboard; scoped shells (e.g. Finance) should pass their own home route. */
   homeHref?: string;
 }
@@ -27,7 +26,7 @@ interface SidebarMobileDrawerProps {
  * - Focus trap
  * - Always expanded (no collapsed mode)
  */
-export function SidebarMobileDrawer({ sidebarData, sections, unreadNotifications, homeHref = "/dashboard" }: SidebarMobileDrawerProps) {
+export function SidebarMobileDrawer({ sidebarData, sections, homeHref = "/dashboard" }: SidebarMobileDrawerProps) {
   const isMobileOpen = useSidebarStore((s) => s.isMobileOpen);
   const closeMobile = useSidebarStore((s) => s.closeMobile);
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -118,7 +117,7 @@ export function SidebarMobileDrawer({ sidebarData, sections, unreadNotifications
 
             {/* Bottom */}
             <div className="shrink-0 pb-4">
-              <SidebarBottomSection unreadNotifications={unreadNotifications} />
+              <SidebarBottomSection />
             </div>
           </motion.div>
         </>
