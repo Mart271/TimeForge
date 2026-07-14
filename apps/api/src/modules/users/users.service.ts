@@ -440,6 +440,8 @@ export class UsersService {
         category: 'ACCOUNT',
         title: 'Department updated',
         message: department ? `You've been moved to the ${department.name} department.` : 'Your department has been updated.',
+        actionUrl: '/settings',
+        actionLabel: 'View Profile',
       });
     }
 
@@ -572,6 +574,8 @@ export class UsersService {
       category: 'ACCOUNT',
       title: 'Account approved',
       message: 'Your account has been approved by an administrator.',
+      actionUrl: '/dashboard',
+      actionLabel: 'Go to Dashboard',
       metadata: { decision: 'APPROVED' },
     });
 
@@ -729,6 +733,8 @@ export class UsersService {
       category: 'ACCOUNT',
       title: 'Password changed',
       message: 'Your password was changed successfully.',
+      actionUrl: '/settings',
+      actionLabel: 'Review Security',
     });
   }
 
@@ -795,6 +801,8 @@ export class UsersService {
       category: 'ACCOUNT',
       title: 'Role updated',
       message: `Your access role was updated to ${roles.map((r) => r.name).join(', ')}.`,
+      actionUrl: '/dashboard',
+      actionLabel: 'Go to Dashboard',
     });
     return this.findOne(caller, userId);
   }

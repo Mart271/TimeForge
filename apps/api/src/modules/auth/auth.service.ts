@@ -544,6 +544,8 @@ export class AuthService {
           priority: 'HIGH',
           title: 'New employee awaiting approval',
           message: `${fullName} registered as "${requestedLabel}" and is awaiting approval.`,
+          actionUrl: '/admin/approvals',
+          actionLabel: 'Review Approval',
           metadata: {
             userId: pendingUserId,
             name: fullName,
