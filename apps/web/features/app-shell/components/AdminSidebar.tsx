@@ -54,13 +54,6 @@ export function AdminSidebar() {
     [sidebarData?.menu],
   );
 
-  const unreadNotifications = useMemo(() => {
-    if (!sidebarData) return 0;
-    // Find unread count from the notifications badge or compute from menu items
-    const notifItem = sidebarData.menu.find((m) => m.id === "notifications");
-    return notifItem?.badgeCount ?? 0;
-  }, [sidebarData]);
-
   return (
     <>
       {/* Desktop sidebar */}
@@ -88,7 +81,7 @@ export function AdminSidebar() {
 
         {/* Bottom: Notifications + Settings + Sign Out */}
         <div className="shrink-0">
-          <SidebarBottomSection unreadNotifications={unreadNotifications} />
+          <SidebarBottomSection />
         </div>
       </aside>
 
@@ -96,7 +89,6 @@ export function AdminSidebar() {
       <SidebarMobileDrawer
         sidebarData={sidebarData ?? null}
         sections={sections}
-        unreadNotifications={unreadNotifications}
       />
     </>
   );
