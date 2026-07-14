@@ -100,6 +100,33 @@ async function main() {
   await ensureUser('hr@demo.test', 'Hana', 'HumanResources', Role.HR, EmploymentType.FULL_TIME, true);
   await ensureUser('finance@demo.test', 'Finn', 'Finance', Role.FINANCE, EmploymentType.FULL_TIME, true);
 
+  // ── Pending registration (for testing the approval modal) ──────────────────
+  const pendingEmail = 'pending@demo.test';
+  const pendingUser =
+    (await prisma.user.findFirst({ where: { tenantId: tenant.id, email: pendingEmail, deletedAt: null } })) ??
+    (await prisma.user.create({
+      data: {
+        tenantId: tenant.id,
+        organizationId: org.id,
+        email: pendingEmail,
+        firstName: 'Parker',
+        lastName: 'Pending',
+        passwordHash,
+        status: UserStatus.PENDING,
+        isApproved: false,
+        employmentType: EmploymentType.EMPLOYEE,
+        payrollEligible: true,
+      },
+    }));
+  const employeeRole = await prisma.role.findFirstOrThrow({
+    where: { tenantId: tenant.id, key: Role.EMPLOYEE, deletedAt: null },
+  });
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: pendingUser.id, roleId: employeeRole.id } },
+    update: {},
+    create: { userId: pendingUser.id, roleId: employeeRole.id },
+  });
+
   // ── Organization settings (centralized config) ─────────────────────────────
   const settings: { key: string; value: unknown; type: string }[] = [
     { key: 'timezone', value: 'Asia/Manila', type: 'scalar' },
@@ -248,6 +275,7 @@ async function main() {
   console.log('✓ Seed complete (Phase 6).');
   console.log('  Tenant: demo   Org: demo-org (Asia/Manila)');
   console.log('  Login:  admin@demo.test / ChangeMe123!  (also employee@, intern@, supervisor@, hr@, finance@)');
+  console.log('  Pending: pending@demo.test / ChangeMe123!  (for testing approval modal)');
   console.log('  Dept: Engineering | Team: Backend | Client: ACME | Project: TF-2026 | 3 Work Categories | 3 Holidays');
 }
 
