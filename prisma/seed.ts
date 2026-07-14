@@ -97,7 +97,7 @@ async function main() {
   await ensureUser('employee@demo.test', 'Eli', 'Employee', Role.EMPLOYEE, EmploymentType.EMPLOYEE, true);
   await ensureUser('intern@demo.test', 'Ivy', 'Intern', Role.EMPLOYEE, EmploymentType.INTERN, false);
   const supervisor = await ensureUser('supervisor@demo.test', 'Sam', 'Supervisor', Role.SUPERVISOR, EmploymentType.FULL_TIME, true);
-  await ensureUser('hr@demo.test', 'Hana', 'HumanResources', Role.HR, EmploymentType.FULL_TIME, true);
+  const hr = await ensureUser('hr@demo.test', 'Hana', 'HumanResources', Role.HR, EmploymentType.FULL_TIME, true);
   await ensureUser('finance@demo.test', 'Finn', 'Finance', Role.FINANCE, EmploymentType.FULL_TIME, true);
 
   // ── Pending registration (for testing the approval modal) ──────────────────
@@ -181,16 +181,25 @@ async function main() {
   const engineeringDept =
     (await prisma.department.findFirst({ where: { tenantId: tenant.id, organizationId: org.id, name: 'Engineering', deletedAt: null } })) ??
     (await prisma.department.create({
-      data: { tenantId: tenant.id, organizationId: org.id, name: 'Engineering', createdBy: admin.id, updatedBy: admin.id },
+      data: { tenantId: tenant.id, organizationId: org.id, name: 'Engineering', managerId: supervisor.id, createdBy: admin.id, updatedBy: admin.id },
     }));
-  if (!(await prisma.department.findFirst({ where: { tenantId: tenant.id, organizationId: org.id, name: 'Human Resources', deletedAt: null } }))) {
-    await prisma.department.create({
-      data: { tenantId: tenant.id, organizationId: org.id, name: 'Human Resources', createdBy: admin.id, updatedBy: admin.id },
-    });
-  }
+  // Ensure supervisor is set as Engineering department head (in case dept already existed without one).
+  await prisma.department.updateMany({
+    where: { id: engineeringDept.id, managerId: null, deletedAt: null },
+    data: { managerId: supervisor.id, updatedBy: admin.id },
+  });
 
-  // Assign demo staff to Engineering so profile-driven fields (e.g. the
-  // Daily Scrum "Department" auto-fill) have data out of the box.
+  const hrDept =
+    (await prisma.department.findFirst({ where: { tenantId: tenant.id, organizationId: org.id, name: 'Human Resources', deletedAt: null } })) ??
+    (await prisma.department.create({
+      data: { tenantId: tenant.id, organizationId: org.id, name: 'Human Resources', managerId: hr.id, createdBy: admin.id, updatedBy: admin.id },
+    }));
+  await prisma.department.updateMany({
+    where: { id: hrDept.id, managerId: null, deletedAt: null },
+    data: { managerId: hr.id, updatedBy: admin.id },
+  });
+
+  // Assign demo staff to their departments.
   await prisma.user.updateMany({
     where: {
       tenantId: tenant.id,
@@ -198,6 +207,14 @@ async function main() {
       departmentId: null,
     },
     data: { departmentId: engineeringDept.id },
+  });
+  await prisma.user.updateMany({
+    where: {
+      tenantId: tenant.id,
+      email: 'hr@demo.test',
+      departmentId: null,
+    },
+    data: { departmentId: hrDept.id },
   });
 
   // Team
