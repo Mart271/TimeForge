@@ -63,6 +63,8 @@ export function EmployeeScheduleCalendar() {
     queries: weekStarts.map((ws) => ({
       queryKey: ["schedules", "calendar", ws],
       queryFn: () => getCalendar({ weekStart: ws }),
+      refetchInterval: 30_000,
+      refetchOnWindowFocus: true,
     })),
   });
 
