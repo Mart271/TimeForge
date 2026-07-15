@@ -200,7 +200,9 @@ export class ScrumService {
       type: 'ANNOUNCEMENT',
       category: 'DAILY_SCRUM',
       title: 'Supervisor commented on your scrum entry',
-      message: 'Your supervisor left feedback on your recent daily scrum entry.',
+      // Include the actual feedback so the employee can read it directly — the
+      // note isn't surfaced elsewhere on the employee's scrum view.
+      message: `Your supervisor left feedback: "${dto.comment.trim().slice(0, 500)}"`,
       actionUrl: '/time-tracking',
       actionLabel: 'View Scrum',
     });

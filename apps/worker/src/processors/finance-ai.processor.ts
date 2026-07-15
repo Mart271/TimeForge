@@ -125,7 +125,7 @@ export class FinanceAiProcessor extends WorkerHost {
 
       // ── 6. Notify finance users (after successful atomic persist) ────────
       this.logger.log(`Finance-AI job ${jobId} SUCCEEDED — sending notifications`);
-      await this.sendNotifications(tenantId, organizationId, reportData);
+      await this.sendNotifications(jobId, tenantId, organizationId, reportData);
 
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -147,6 +147,7 @@ export class FinanceAiProcessor extends WorkerHost {
   }
 
   private async sendNotifications(
+    jobId: string,
     tenantId: string,
     organizationId: string,
     reportData: FinanceAiJobData['reportData'],
@@ -172,7 +173,7 @@ export class FinanceAiProcessor extends WorkerHost {
             category: 'PAYROLL',
             title: 'AI Financial Report Ready',
             message: `AI analysis complete: ${reportData.alertSummary.total} alerts found (${reportData.alertSummary.critical} critical).`,
-            actionUrl: '/finance/ai-insights',
+            actionUrl: `/finance/ai-insights?reportId=${jobId}`,
             actionLabel: 'View Report',
           }),
         ),

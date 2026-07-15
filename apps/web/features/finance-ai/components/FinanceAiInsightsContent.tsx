@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   TrendingUp,
@@ -98,6 +99,7 @@ const budgetStatusConfig: Record<string, { label: string; tone: BadgeTone }> = {
 };
 
 export function FinanceAiInsightsContent() {
+  const searchParams = useSearchParams();
   const [toast, setToast] = useState<ToastState | null>(null);
   const [forecastPeriod, setForecastPeriod] = useState<string>("monthly");
   const [alertSeverity, setAlertSeverity] = useState<string>("ALL");
@@ -149,6 +151,7 @@ export function FinanceAiInsightsContent() {
   const reportMutation = useMutation({
     mutationFn: generateAiReport,
     onSuccess: (res) => {
+      setPendingJobId(res.jobId);
       setToast({ message: res.message || "AI report generation queued.", tone: "success" });
     },
     onError: (err: any) => {
@@ -175,6 +178,20 @@ export function FinanceAiInsightsContent() {
     if (pendingJobId) pollStartRef.current = Date.now();
     if (!pendingJobId) pollStartRef.current = null;
   }, [pendingJobId]);
+
+  useEffect(() => {
+    const reportId = searchParams.get("reportId");
+    if (reportId) {
+      setPendingJobId(reportId);
+      getAiReport(reportId).then((result) => {
+        if (result.status === "SUCCEEDED" || result.status === "FAILED") {
+          setPendingJobId(null);
+          setCompletedReport(result);
+          setReportModalOpen(true);
+        }
+      }).catch(() => { /* will poll instead */ });
+    }
+  }, [searchParams]);
 
   useQuery({
     queryKey: ["finance-ai", "report-poll", pendingJobId],

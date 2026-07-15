@@ -32,6 +32,12 @@ export default () => ({
   },
   storage: {
     driver: process.env.STORAGE_DRIVER ?? 'local',
+    // Public base URL of THIS API, used by the local-disk provider to build
+    // browser-loadable avatar URLs (never `file://`). Railway injects
+    // RAILWAY_PUBLIC_DOMAIN; override with API_PUBLIC_URL if needed.
+    publicUrl:
+      process.env.API_PUBLIC_URL ??
+      (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : undefined),
   },
   argon2: {
     memoryCost: parseInt(process.env.ARGON2_MEMORY_COST ?? '65536', 10),
