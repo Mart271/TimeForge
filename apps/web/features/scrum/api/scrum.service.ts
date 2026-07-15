@@ -131,6 +131,11 @@ export async function listScrumEntries(params: { from?: string; to?: string; lim
   return data;
 }
 
+export async function getScrumEntry(id: string): Promise<ScrumEntry> {
+  const { data } = await apiClient.get<ScrumEntry>(`/scrum-entries/${id}`);
+  return data;
+}
+
 export async function createScrumEntry(payload: CreateScrumEntryPayload): Promise<ScrumEntry> {
   const { data } = await apiClient.post<ScrumEntry>("/scrum-entries", payload);
   return data;
