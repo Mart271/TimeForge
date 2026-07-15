@@ -174,7 +174,12 @@ export function AddShiftDrawer({ open, onOpenChange, onToast, managedDeptIds }: 
               <FieldLabel htmlFor="shift-department">Department</FieldLabel>
               <Select value={departmentId} onValueChange={(v) => setDepartmentId(v ?? "")}>
                 <SelectTrigger id="shift-department" className="h-11 w-full rounded-[10px] border-[#c3c6d2] bg-white px-3.5 text-[15px]">
-                  <SelectValue placeholder="Select department (optional)" />
+                  <SelectValue placeholder="Select department (optional)">
+                    {(value: string) =>
+                      !value
+                        ? "Select department (optional)"
+                        : visibleDepartments.find((d) => d.id === value)?.name ?? value}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {visibleDepartments.map((d) => (

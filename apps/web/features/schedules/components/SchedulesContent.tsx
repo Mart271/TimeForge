@@ -135,9 +135,10 @@ export function SchedulesContent() {
             <Select value={departmentId} onValueChange={(v) => setDepartmentId(v ?? "ALL")}>
               <SelectTrigger aria-label="Filter by department" className="h-9 w-48 rounded-[8px] border-[#c3c6d2]/60 bg-white px-3 text-sm">
                 <SelectValue placeholder="All Departments">
-                  {departmentId === "ALL"
-                    ? "All Departments"
-                    : departments?.find((d) => d.id === departmentId)?.name ?? departmentId}
+                  {(value: string) =>
+                    value === "ALL" || !value
+                      ? "All Departments"
+                      : departments?.find((d) => d.id === value)?.name ?? value}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
