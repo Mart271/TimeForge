@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import {
@@ -57,9 +57,10 @@ interface AddShiftDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onToast: (t: ToastState) => void;
+  managedDeptIds?: string[];
 }
 
-export function AddShiftDrawer({ open, onOpenChange, onToast }: AddShiftDrawerProps) {
+export function AddShiftDrawer({ open, onOpenChange, onToast, managedDeptIds }: AddShiftDrawerProps) {
   const queryClient = useQueryClient();
   const [userId, setUserId] = useState("");
   const [departmentId, setDepartmentId] = useState("");
@@ -73,9 +74,21 @@ export function AddShiftDrawer({ open, onOpenChange, onToast }: AddShiftDrawerPr
   const { data: employees } = useQuery({ queryKey: ["employees", "picker"], queryFn: () => listEmployees({ limit: 100 }), enabled: open });
   const { data: departments } = useQuery({ queryKey: ["departments", "picker"], queryFn: listDepartments, enabled: open });
 
+  const visibleDepartments = managedDeptIds
+    ? (departments ?? []).filter((d) => managedDeptIds.includes(d.id))
+    : departments ?? [];
+  const visibleEmployees = managedDeptIds
+    ? (employees?.data ?? []).filter((e) => e.departmentId && managedDeptIds.includes(e.departmentId))
+    : employees?.data ?? [];
+  const singleDept = visibleDepartments.length === 1 ? visibleDepartments[0].id : null;
+
+  useEffect(() => {
+    if (singleDept && open && !departmentId) setDepartmentId(singleDept);
+  }, [singleDept, open, departmentId]);
+
   const reset = () => {
     setUserId("");
-    setDepartmentId("");
+    setDepartmentId(singleDept ?? "");
     setDate("");
     setStartTime("");
     setEndTime("");
@@ -133,7 +146,7 @@ export function AddShiftDrawer({ open, onOpenChange, onToast }: AddShiftDrawerPr
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(employees?.data ?? []).map((e) => (
+                  {visibleEmployees.map((e) => (
                     <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName}</SelectItem>
                   ))}
                 </SelectContent>
@@ -156,6 +169,7 @@ export function AddShiftDrawer({ open, onOpenChange, onToast }: AddShiftDrawerPr
               </div>
             </div>
 
+            {!singleDept ? (
             <div>
               <FieldLabel htmlFor="shift-department">Department</FieldLabel>
               <Select value={departmentId} onValueChange={(v) => setDepartmentId(v ?? "")}>
@@ -163,12 +177,13 @@ export function AddShiftDrawer({ open, onOpenChange, onToast }: AddShiftDrawerPr
                   <SelectValue placeholder="Select department (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(departments ?? []).map((d) => (
+                  {visibleDepartments.map((d) => (
                     <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+            ) : null}
 
             <div>
               <FieldLabel htmlFor="shift-type">Shift Type</FieldLabel>

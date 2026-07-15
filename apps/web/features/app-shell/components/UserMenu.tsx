@@ -49,7 +49,8 @@ export function UserMenu() {
   const [leaveOpen, setLeaveOpen] = useState(false);
   // Roles without time_entry:read (Finance, HR) can never have a work session —
   // this would otherwise retry a permanent 403 forever.
-  const canHaveWorkSession = hasPermission(user?.roles, "time_entry:read");
+  const isExcludedRole = user?.roles.some((r) => r === "HR" || r === "FINANCE") ?? false;
+  const canHaveWorkSession = !isExcludedRole && hasPermission(user?.roles, "time_entry:read");
   // Daily Scrum / Timesheet / Request Leave are individual-contributor actions —
   // only Employees see them here, regardless of what other permissions a role holds.
   const isEmployee = user?.roles.includes("EMPLOYEE") ?? false;

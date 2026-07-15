@@ -16,6 +16,7 @@ function endOfMonth(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0));
 }
 
+/** ISO week start (Monday) for a given date. */
 function weekStartOf(date: Date): string {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   const day = d.getUTCDay();
@@ -24,6 +25,7 @@ function weekStartOf(date: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Generate all ISO week-start dates that touch a given month. */
 function weeksInMonth(year: number, month: number): string[] {
   const first = new Date(Date.UTC(year, month, 1));
   const last = new Date(Date.UTC(year, month + 1, 0));
@@ -68,6 +70,7 @@ export function EmployeeScheduleCalendar() {
 
   const isLoading = weekQueries.some((q) => q.isLoading);
 
+  // Merge all shifts from all weeks into a date-keyed map.
   const shiftsByDate: ShiftByDate = useMemo(() => {
     const map: ShiftByDate = {};
     for (const q of weekQueries) {
@@ -83,10 +86,11 @@ export function EmployeeScheduleCalendar() {
     return map;
   }, [weekQueries]);
 
+  // Build the calendar grid (6 rows × 7 cols max).
   const todayStr = new Date().toISOString().slice(0, 10);
   const firstDay = startOfMonth(new Date(Date.UTC(year, month, 1)));
   const lastDay = endOfMonth(new Date(Date.UTC(year, month, 1)));
-  const startDow = (firstDay.getUTCDay() + 6) % 7;
+  const startDow = (firstDay.getUTCDay() + 6) % 7; // Mon=0
   const totalDays = lastDay.getUTCDate();
 
   const cells: (number | null)[] = [];
@@ -105,6 +109,7 @@ export function EmployeeScheduleCalendar() {
 
   return (
     <div className="rounded-[16px] border border-[#c3c6d2]/50 bg-white p-5 shadow-[0px_1px_1px_rgba(0,0,0,0.05)]">
+      {/* Month navigator */}
       <div className="flex items-center justify-between mb-4">
         <button
           type="button"
@@ -129,12 +134,14 @@ export function EmployeeScheduleCalendar() {
         <p className="text-sm text-brand-muted py-8 text-center">Loading schedule…</p>
       ) : (
         <div className="grid grid-cols-7 gap-px bg-[#c3c6d2]/30 rounded-[12px] overflow-hidden border border-[#c3c6d2]/30">
+          {/* Day headers */}
           {DAY_NAMES.map((name) => (
             <div key={name} className="bg-[#f6f3f4] px-2 py-2 text-center text-[10px] font-bold uppercase tracking-wider text-brand-muted">
               {name}
             </div>
           ))}
 
+          {/* Day cells */}
           {cells.map((day, idx) => {
             if (day === null) {
               return <div key={`empty-${idx}`} className="bg-white min-h-[90px]" />;

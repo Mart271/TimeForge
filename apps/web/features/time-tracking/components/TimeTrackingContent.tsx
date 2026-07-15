@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import { SunsetIcon } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,7 +10,7 @@ import { ErrorState } from "@/components/shared/ErrorState";
 import { Toast, type ToastState } from "@/components/shared/Toast";
 import { listTimeEntries, listAllTimeEntries } from "../api/time-entries.service";
 import { getCurrentWorkSession } from "../api/work-sessions.service";
-import { listScrumEntries } from "@/features/scrum/api/scrum.service";
+import { listScrumEntries, getScrumEntry } from "@/features/scrum/api/scrum.service";
 import { getMe } from "@/features/account/api/account.service";
 import { fetchDepartments } from "@/features/auth/api/auth.service";
 import { summarizeDay } from "../lib/day-summary";
@@ -31,6 +32,8 @@ import { startOfDay, endOfDay, toIsoDate, weekWindow } from "@/lib/time";
  * (time-entries, scrum-entries, catalogs, users/me, dashboard/summary).
  */
 export function TimeTrackingContent() {
+  const searchParams = useSearchParams();
+  const deepLinkId = searchParams.get("scrum");
   const [eodOpen, setEodOpen] = useState(false);
   const [dayClosed, setDayClosed] = useState(false);
   const [selectedTask, setSelectedTask] = useState<WorkTask | null>(null);
@@ -69,6 +72,12 @@ export function TimeTrackingContent() {
     queryFn: () => listScrumEntries({ from: toIsoDate(today), to: toIsoDate(today), limit: 1 }),
   });
 
+  const deepLinkQuery = useQuery({
+    queryKey: ["scrum-entries", deepLinkId],
+    queryFn: () => getScrumEntry(deepLinkId!),
+    enabled: Boolean(deepLinkId),
+  });
+
   const workSessionQuery = useQuery({
     queryKey: ["work-session", "current"],
     queryFn: getCurrentWorkSession,
@@ -86,7 +95,7 @@ export function TimeTrackingContent() {
   }, [entriesQuery.data, runningQuery.data]);
   const weekEntries = useMemo(() => weekQuery.data ?? [], [weekQuery.data]);
   const summary = useMemo(() => summarizeDay(entries), [entries]);
-  const scrumEntry = scrumQuery.data?.data[0] ?? null;
+  const scrumEntry = deepLinkQuery.data ?? scrumQuery.data?.data[0] ?? null;
   const onBreak = workSessionQuery.data?.onBreak ?? false;
 
   // Work Details must stay editable while clocked in — including on break, when

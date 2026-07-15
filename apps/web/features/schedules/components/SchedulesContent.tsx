@@ -173,7 +173,7 @@ export function SchedulesContent() {
         <EmployeeScheduleCalendar />
       )}
 
-      <AddShiftDrawer open={addShiftOpen} onOpenChange={setAddShiftOpen} onToast={setToast} />
+      <AddShiftDrawer open={addShiftOpen} onOpenChange={setAddShiftOpen} onToast={setToast} managedDeptIds={managedDeptIds} />
     </div>
   );
 }
