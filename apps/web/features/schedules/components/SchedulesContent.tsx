@@ -46,7 +46,10 @@ export function SchedulesContent() {
   const [addShiftOpen, setAddShiftOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
 
-  const { data: departments } = useQuery({ queryKey: ["departments", "picker"], queryFn: listDepartments });
+  const { data: allDepartments } = useQuery({ queryKey: ["departments", "picker"], queryFn: listDepartments });
+  const isSupervisorOnly = canManage && user?.roles.some((r) => r === "SUPERVISOR") && !user?.roles.some((r) => ["HR", "ADMIN"].includes(r));
+  const departments = isSupervisorOnly ? (allDepartments ?? []).filter((d) => d.manager?.id === user?.id) : (allDepartments ?? []);
+  const managedDeptIds = isSupervisorOnly ? departments.map((d) => d.id) : undefined;
   const { data: calendar, isLoading } = useQuery({
     queryKey: ["schedules", "calendar", weekStart, departmentId],
     queryFn: () => getCalendar({ weekStart, departmentId: departmentId !== "ALL" ? departmentId : undefined }),
@@ -166,7 +169,7 @@ export function SchedulesContent() {
         <EmployeeScheduleCalendar />
       )}
 
-      <AddShiftDrawer open={addShiftOpen} onOpenChange={setAddShiftOpen} onToast={setToast} />
+      <AddShiftDrawer open={addShiftOpen} onOpenChange={setAddShiftOpen} onToast={setToast} managedDeptIds={managedDeptIds} />
     </div>
   );
 }
