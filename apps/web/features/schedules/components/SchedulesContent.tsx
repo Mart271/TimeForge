@@ -64,8 +64,8 @@ export function SchedulesContent() {
     <div className="flex flex-col gap-6">
       <Toast toast={toast} onDismiss={() => setToast(null)} />
       <PageHeader
-        title="Team Schedules"
-        subtitle="Plan, publish, and track your team's weekly shifts."
+        title={canManage ? "Team Schedules" : "My Schedule"}
+        subtitle={canManage ? "Plan, publish, and track your team's weekly shifts." : "View your upcoming shifts."}
         action={
           canManage ? (
             <Button onClick={() => setAddShiftOpen(true)} className="flex items-center gap-2 bg-brand text-white hover:bg-[#1467d6]">
@@ -126,22 +126,24 @@ export function SchedulesContent() {
           />
         ) : null}
 
-        <div className="ml-auto">
-          <Select value={departmentId} onValueChange={(v) => setDepartmentId(v ?? "ALL")}>
-            <SelectTrigger aria-label="Filter by department" className="h-9 w-48 rounded-[8px] border-[#c3c6d2]/60 bg-white px-3 text-sm">
-              <SelectValue placeholder="All Departments" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Departments</SelectItem>
-              {(departments ?? []).map((d) => (
-                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {canManage ? (
+          <div className="ml-auto">
+            <Select value={departmentId} onValueChange={(v) => setDepartmentId(v ?? "ALL")}>
+              <SelectTrigger aria-label="Filter by department" className="h-9 w-48 rounded-[8px] border-[#c3c6d2]/60 bg-white px-3 text-sm">
+                <SelectValue placeholder="All Departments" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Departments</SelectItem>
+                {(departments ?? []).map((d) => (
+                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
       </div>
 
-      <ScheduleSummaryCards summary={calendar?.summary} isLoading={isLoading} />
+      {canManage ? <ScheduleSummaryCards summary={calendar?.summary} isLoading={isLoading} /> : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         <div className="rounded-[16px] border border-[#c3c6d2]/50 bg-white p-5 shadow-[0px_1px_1px_rgba(0,0,0,0.05)]">
@@ -155,7 +157,7 @@ export function SchedulesContent() {
             canManage={canManage}
           />
         </div>
-        <ScheduleSidebar efficiency={calendar?.efficiency ?? []} canManage={canManage} />
+        {canManage ? <ScheduleSidebar efficiency={calendar?.efficiency ?? []} canManage={canManage} /> : null}
       </div>
 
       <AddShiftDrawer open={addShiftOpen} onOpenChange={setAddShiftOpen} onToast={setToast} />

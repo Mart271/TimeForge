@@ -25,6 +25,7 @@ const MENU_CATALOG: MenuItemDef[] = [
   { id: 'dashboard',    label: 'Dashboard',    icon: 'layout-grid',  route: '/dashboard',          section: 'WORKSPACE',        permission: 'dashboard:read_self' },
   { id: 'daily-scrum',  label: 'Daily Scrum',  icon: 'timer',        route: '/time-tracking',      section: 'WORKSPACE',        permission: 'scrum:read' },
   { id: 'timesheets',   label: 'Timesheets',   icon: 'file-text',    route: '/timesheets',         section: 'WORKSPACE',        permission: 'timesheet:read',            badge: 'pendingTimesheets' },
+  { id: 'my-schedule',  label: 'My Schedule',  icon: 'calendar-days', route: '/schedules',         section: 'WORKSPACE',        permission: 'schedule:read' },
   { id: 'schedules',    label: 'Team Schedules', icon: 'calendar-days', route: '/schedules',       section: 'MANAGEMENT',       permission: 'schedule:read_team' },
   { id: 'kpi-dashboard', label: 'KPI Dashboard', icon: 'target',       route: '/kpi-dashboard',   section: 'MANAGEMENT',       permission: 'kpi_progress:read_team' },
   { id: 'supervisor-ai-insights', label: 'AI Insights', icon: 'sparkles', route: '/supervisor/ai-insights', section: 'MANAGEMENT', permission: 'ai:trigger_team' },
@@ -85,9 +86,17 @@ export class NavigationService {
 
     const isSupervisorOnly = user.roles.includes('SUPERVISOR') && !isAdmin;
     const isHrOnly = user.roles.includes('HR') && !isAdmin;
+    const isEmployeeOnly = (user.roles.includes('EMPLOYEE') || user.roles.includes('INTERN')) && !isAdmin
+      && !user.roles.includes('SUPERVISOR') && !user.roles.includes('HR');
 
     // Filter menu by permission
     const visibleItems = MENU_CATALOG.filter((item) => {
+      // "My Schedule" is the employee/intern self-view of their own shifts.
+      // Supervisors, HR, and Admin see "Team Schedules" instead.
+      if (item.id === 'my-schedule') return isEmployeeOnly;
+      // "Team Schedules" is for managers — hide from pure employees/interns who
+      // already see "My Schedule" above.
+      if (item.id === 'schedules' && isEmployeeOnly) return false;
       // Performance Insights is an individual-contributor view — employees only.
       if (item.id === 'performance') return user.roles.includes('EMPLOYEE');
       // Team KPI Dashboard is a direct-reports management tool — supervisors only.

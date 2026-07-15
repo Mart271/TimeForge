@@ -203,7 +203,7 @@ export class ScrumService {
       // Include the actual feedback so the employee can read it directly — the
       // note isn't surfaced elsewhere on the employee's scrum view.
       message: `Your supervisor left feedback: "${dto.comment.trim().slice(0, 500)}"`,
-      actionUrl: '/time-tracking',
+      actionUrl: `/time-tracking?scrum=${id}`,
       actionLabel: 'View Scrum',
     });
 
@@ -286,7 +286,7 @@ export class ScrumService {
       category: 'DAILY_SCRUM',
       title: "Today's Commitment unlocked",
       message: `Your supervisor unlocked today's commitment so you can edit it again. Reason: ${reason}`,
-      actionUrl: '/time-tracking',
+      actionUrl: `/time-tracking?scrum=${id}`,
       actionLabel: 'Edit Scrum',
     });
 
@@ -923,7 +923,7 @@ export class ScrumService {
       category: 'DAILY_SCRUM',
       title: 'Scrum plan flagged',
       message: 'Your supervisor flagged a recurring issue on your recent daily scrum entry.',
-      actionUrl: '/time-tracking',
+      actionUrl: `/time-tracking?scrum=${id}`,
       actionLabel: 'View Scrum',
     });
 
