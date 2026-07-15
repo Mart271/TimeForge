@@ -31,7 +31,7 @@ const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     "payroll:read_status_team",
     "dashboard:read_self", "dashboard:read_team",
     "project:read", "client:read", "work_category:read", "department:read", "team:read",
-    "schedule:read_team",
+    "schedule:read", "schedule:read_team",
     "ai:trigger_team",
     "leave_request:create", "leave_request:read", "leave_request:cancel", "leave_balance:read",
     "leave_request:read_team", "leave_request:decide",
@@ -47,6 +47,7 @@ const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     "org:read_dashboard",
     "org:read",
     "leave_request:read_org", "leave_request:decide", "leave_balance:read_org",
+    "schedule:read",
   ],
   FINANCE: [
     "user:read",
