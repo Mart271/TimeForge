@@ -20,6 +20,11 @@ interface CurrentSessionCardProps {
   selectedTask: WorkTask | null;
   /** Task name of the currently running time entry, for the "Working on" tile. */
   runningTask: string | null;
+  /** Project/client saved on the running entry (e.g. via Work Details) — shown
+   *  in the context tiles so saved work details reflect here, not just the
+   *  Quick Select choice. */
+  runningProjectId?: string | null;
+  runningClientId?: string | null;
   loading: boolean;
   /** Opens the End of Day Review (the only path that stops AND reviews). */
   onTimeOut: () => void;
@@ -34,6 +39,8 @@ interface CurrentSessionCardProps {
 export function CurrentSessionCard({
   selectedTask,
   runningTask,
+  runningProjectId,
+  runningClientId,
   loading,
   onTimeOut,
 }: CurrentSessionCardProps) {
@@ -136,12 +143,12 @@ export function CurrentSessionCard({
     },
     {
       label: "Project",
-      value: nameOf(projects, selectedTask?.projectId) ?? "—",
+      value: nameOf(projects, runningProjectId ?? selectedTask?.projectId) ?? "—",
       icon: <FolderKanban className="h-3.5 w-3.5" aria-hidden="true" />,
     },
     {
       label: "Client",
-      value: nameOf(clients, selectedTask?.clientId) ?? "—",
+      value: nameOf(clients, runningClientId ?? selectedTask?.clientId) ?? "—",
       icon: <Building2 className="h-3.5 w-3.5" aria-hidden="true" />,
     },
   ];

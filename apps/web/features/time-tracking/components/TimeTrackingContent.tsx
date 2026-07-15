@@ -169,6 +169,8 @@ export function TimeTrackingContent() {
             <CurrentSessionCard
               selectedTask={selectedTask}
               runningTask={summary.running?.task ?? null}
+              runningProjectId={summary.running?.projectId ?? null}
+              runningClientId={summary.running?.clientId ?? null}
               loading={entriesQuery.isFetching}
               onTimeOut={() => setEodOpen(true)}
             />

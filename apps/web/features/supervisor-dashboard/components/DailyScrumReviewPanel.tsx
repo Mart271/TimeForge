@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { GraduationCap, Loader2, Send, TriangleAlert } from "lucide-react";
+import { Loader2, Send, TriangleAlert, UserRound } from "lucide-react";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Avatar } from "@/components/shared/Avatar";
@@ -49,8 +49,8 @@ function FeedbackRow({ row, onToast }: { row: ScrumReviewRow; onToast: (t: Toast
           onClick={() => openProfileModal(row.userId)}
           className="flex shrink-0 items-center gap-1.5 rounded-[8px] border border-[#c3c6d2]/60 px-2.5 py-1.5 text-xs font-bold text-brand-ink hover:bg-[#f6f3f4]"
         >
-          <GraduationCap className="h-3.5 w-3.5" aria-hidden="true" />
-          Coach
+          <UserRound className="h-3.5 w-3.5" aria-hidden="true" />
+          View Profile
         </button>
       </div>
 
