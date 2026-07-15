@@ -25,7 +25,8 @@ export function RunningTimerChip() {
   const { user } = useAuth();
   // Roles without time_entry:read (Finance, HR) can never have a work session —
   // polling this endpoint for them just retries a permanent 403 forever.
-  const canHaveWorkSession = hasPermission(user?.roles, "time_entry:read");
+  const isExcludedRole = user?.roles.some((r) => r === "HR" || r === "FINANCE") ?? false;
+  const canHaveWorkSession = !isExcludedRole && hasPermission(user?.roles, "time_entry:read");
 
   const { data: workSession } = useQuery({
     queryKey: ["work-session", "current"],
