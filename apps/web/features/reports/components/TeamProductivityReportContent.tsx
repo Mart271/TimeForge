@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   Calendar, 
   Search, 
@@ -11,15 +11,28 @@ import {
   DollarSign, 
   CheckCircle2, 
   AlertCircle,
-  FileText
+  FileText,
+  Trash2
 } from "lucide-react";
-import { getTeamProductivity, getTeamProductivitySummary, generateReport } from "../api/reports.service";
+import { 
+  getTeamProductivity, 
+  getTeamProductivitySummary, 
+  generateReport,
+  getReportsHistory,
+  auditDownloadReport,
+  deleteReport
+} from "../api/reports.service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Toast, type ToastState } from "@/components/shared/Toast";
+import { StatusBadge, type BadgeTone } from "@/components/shared/StatusBadge";
+import { useAuth } from "@/providers/auth-provider";
 
 export function TeamProductivityReportContent() {
   const [toast, setToast] = useState<ToastState | null>(null);
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.roles.includes("ADMIN") || false;
   
   // Filtering & Pagination parameter state
   const [search, setSearch] = useState("");
@@ -37,6 +50,17 @@ export function TeamProductivityReportContent() {
     limit: 5,
   };
 
+  // Report history state
+  const [historyCategoryFilter, setHistoryCategoryFilter] = useState("ALL");
+  const [historyCursorStack, setHistoryCursorStack] = useState<(string | null)[]>([null]);
+  const [historyCursorIndex, setHistoryCursorIndex] = useState(0);
+
+  const historyQueryParams = {
+    category: historyCategoryFilter === "ALL" ? undefined : historyCategoryFilter,
+    cursor: historyCursorStack[historyCursorIndex] || undefined,
+    limit: 5,
+  };
+
   // Queries
   const { data: summary, isLoading: isSummaryLoading } = useQuery({
     queryKey: ["team-productivity-summary", startDate, endDate],
@@ -46,6 +70,11 @@ export function TeamProductivityReportContent() {
   const { data: productivityData, isLoading: isTableLoading, refetch } = useQuery({
     queryKey: ["team-productivity-details", filterParams],
     queryFn: () => getTeamProductivity(filterParams),
+  });
+
+  const { data: historyData, isLoading: isHistoryLoading, refetch: refetchHistory } = useQuery({
+    queryKey: ["reports", "history", historyQueryParams],
+    queryFn: () => getReportsHistory(historyQueryParams),
   });
 
   // Export Mutation
@@ -59,11 +88,55 @@ export function TeamProductivityReportContent() {
       }),
     onSuccess: (data) => {
       setToast({ message: `Export job for ${data.name} queued successfully in BullMQ.`, tone: "success" });
+      refetchHistory();
     },
     onError: (err: any) => {
       setToast({ message: err?.message || "Export failed.", tone: "error" });
     }
   });
+
+  // Download Report Mutation
+  const downloadMutation = useMutation({
+    mutationFn: (id: string) => auditDownloadReport(id),
+    onSuccess: (data) => {
+      setToast({ message: `Report download logged successfully.`, tone: "success" });
+      refetchHistory();
+      if (data.filePath) {
+        window.open(`/api/storage/${data.filePath}`, "_blank");
+      }
+    },
+    onError: (err: any) => {
+      setToast({ message: err?.message || "Download request failed.", tone: "error" });
+    }
+  });
+
+  // Delete Report Mutation
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteReport(id),
+    onSuccess: () => {
+      setToast({ message: `Report history deleted.`, tone: "success" });
+      refetchHistory();
+    },
+    onError: (err: any) => {
+      setToast({ message: err?.message || "Only Administrators can delete reports.", tone: "error" });
+    }
+  });
+
+  const handleHistoryNextPage = () => {
+    if (historyData?.page.nextCursor) {
+      const nextCursor = historyData.page.nextCursor;
+      setHistoryCursorStack((prev) => [...prev, nextCursor]);
+      setHistoryCursorIndex((prev) => prev + 1);
+    }
+  };
+
+  const handleHistoryPrevPage = () => {
+    if (historyCursorIndex > 0) {
+      setHistoryCursorIndex((prev) => prev - 1);
+    }
+  };
+
+  const history = historyData?.data ?? [];
 
   const handleApplyFilters = () => {
     setCursorStack([null]);
@@ -321,6 +394,140 @@ export function TeamProductivityReportContent() {
               disabled={!productivityData?.page.nextCursor}
               onClick={handleNextPage}
               className="h-8.5 text-xs px-3"
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Reports Table & Generation History (Bottom Widget) */}
+      <div className="rounded-[16px] border border-[#c3c6d2]/50 bg-white p-6 shadow-[0px_1px_2px_rgba(0,0,0,0.05)] mt-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-bold text-brand-navy">Report Generation History</h2>
+          <div className="flex items-center border border-[#c3c6d2] rounded-lg px-2 py-1 gap-1">
+            <span className="text-xs text-brand-muted font-semibold">Category:</span>
+            <select
+              value={historyCategoryFilter}
+              onChange={(e) => {
+                setHistoryCategoryFilter(e.target.value);
+                setHistoryCursorStack([null]);
+                setHistoryCursorIndex(0);
+              }}
+              className="bg-transparent text-xs font-bold text-brand-navy outline-none border-none cursor-pointer"
+            >
+              <option value="ALL">All Categories</option>
+              <option value="ATTENDANCE">Attendance</option>
+              <option value="PAYROLL">Payroll</option>
+              <option value="TIMESHEETS">Timesheets</option>
+              <option value="LABOR_COST">Labor Cost</option>
+              <option value="COMPLIANCE">Compliance</option>
+              <option value="DEPARTMENT_ANALYTICS">Department Analytics</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm border-collapse">
+            <thead>
+              <tr className="border-b border-[#c3c6d2]/40 text-xs font-semibold text-brand-muted uppercase tracking-wider">
+                <th className="py-3 px-4">Report Name</th>
+                <th className="py-3 px-4">Category</th>
+                <th className="py-3 px-4">Generated By</th>
+                <th className="py-3 px-4">Date Range</th>
+                <th className="py-3 px-4">Generated On</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#c3c6d2]/30">
+              {isHistoryLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="py-4 px-4"><div className="h-4 bg-gray-100 rounded w-28"></div></td>
+                    <td className="py-4 px-4"><div className="h-4 bg-gray-100 rounded w-20"></div></td>
+                    <td className="py-4 px-4"><div className="h-4 bg-gray-100 rounded w-32"></div></td>
+                    <td className="py-4 px-4"><div className="h-4 bg-gray-100 rounded w-24"></div></td>
+                    <td className="py-4 px-4"><div className="h-4 bg-gray-100 rounded w-24"></div></td>
+                    <td className="py-4 px-4"><div className="h-6 bg-gray-100 rounded w-16"></div></td>
+                    <td className="py-4 px-4"><div className="h-6 bg-gray-100 rounded w-12"></div></td>
+                  </tr>
+                ))
+              ) : history.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-8 text-brand-muted text-xs">
+                    No reports generated yet. Click CSV, Excel, or PDF to generate reports.
+                  </td>
+                </tr>
+              ) : (
+                history.map((row) => {
+                  let tone: BadgeTone = "success";
+                  if (row.status === "FAILED") tone = "danger";
+                  else if (row.status === "PENDING") tone = "warning";
+
+                  return (
+                    <tr key={row.id} className="hover:bg-[#f8fafc] transition-colors">
+                      <td className="py-4 px-4 text-brand-navy font-semibold">{row.name}</td>
+                      <td className="py-4 px-4 text-xs font-semibold text-brand-muted">{row.category}</td>
+                      <td className="py-4 px-4 text-brand-muted">{row.creator.firstName} {row.creator.lastName}</td>
+                      <td className="py-4 px-4 text-brand-muted text-xs">{row.dateRange || "All-time"}</td>
+                      <td className="py-4 px-4 text-brand-muted text-xs">{new Date(row.createdAt).toLocaleDateString()}</td>
+                      <td className="py-4 px-4">
+                        <StatusBadge label={row.status} tone={tone} />
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            disabled={row.status !== "COMPLETED"}
+                            onClick={() => downloadMutation.mutate(row.id)}
+                            className="h-8 text-xs font-semibold text-[#0052cc]"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                          {isAdmin && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              disabled={deleteMutation.isPending}
+                              onClick={() => deleteMutation.mutate(row.id)}
+                              className="h-8 text-xs font-semibold text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="flex items-center justify-between border-t border-[#c3c6d2]/30 pt-4 mt-4">
+          <span className="text-xs text-brand-muted">
+            Report history logs (downloads count audited)
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={historyCursorIndex === 0}
+              onClick={handleHistoryPrevPage}
+              className="h-8 text-xs px-3"
+            >
+              Previous
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!historyData?.page.nextCursor}
+              onClick={handleHistoryNextPage}
+              className="h-8 text-xs px-3"
             >
               Next
             </Button>
