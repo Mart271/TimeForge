@@ -70,8 +70,10 @@ export class UsersService {
       lockoutUntil: _lu,
       ...safe
     } = user;
-    if (!this.isFinanceOrAdmin(caller)) {
-      // BR-PAY-06: hourly rate hidden from self / Supervisor / HR
+    
+    const isAllowedRole = caller.roles.some((r) => r === 'FINANCE' || r === 'ADMIN' || r === 'HR' || r === 'SUPERVISOR');
+    if (!isAllowedRole && caller.userId !== safe.id) {
+      // Hidden only from other employees/interns
       const { hourlyRate: _rate, ...rest } = safe;
       return rest;
     }

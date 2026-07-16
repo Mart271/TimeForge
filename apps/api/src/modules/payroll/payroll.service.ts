@@ -575,8 +575,7 @@ export class PayrollService {
   }
 
   /**
-   * Employee self-endpoint: returns their own payroll status (hours buckets only, no amounts).
-   * Amounts are Finance/Admin only (BR-PAY-06).
+   * Employee self-endpoint: returns their own payroll status (including base rate and estimated pay).
    */
   async getMyPayrollStatus(p: AuthPrincipal) {
     const lineItems = await this.prisma.payrollLineItem.findMany({
@@ -587,6 +586,8 @@ export class PayrollService {
         pendingHours: true,
         rejectedHours: true,
         overtimeHours: true,
+        hourlyRate: true,
+        estimatedPay: true,
         createdAt: true,
         payrollReport: {
           select: {
@@ -598,13 +599,14 @@ export class PayrollService {
       orderBy: { createdAt: 'desc' },
       take: 10,
     });
-    return lineItems; // hourlyRate and estimatedPay are intentionally excluded
+    return lineItems;
   }
 
-  // -- Hourly Rate Management (Finance / Admin only) --
+  // -- Hourly Rate Management --
 
   async getRate(p: AuthPrincipal, userId: string) {
-    if (!this.can(p, PERMISSIONS.PAYROLL_RATE_READ)) {
+    const isAllowedRole = p.roles.some((r) => r === 'FINANCE' || r === 'ADMIN' || r === 'HR' || r === 'SUPERVISOR');
+    if (userId !== p.userId && !isAllowedRole && !this.can(p, PERMISSIONS.PAYROLL_RATE_READ)) {
       throw new ForbiddenException('Hourly rate is Finance/Admin only (BR-PAY-06)');
     }
     const user = await this.prisma.user.findFirst({

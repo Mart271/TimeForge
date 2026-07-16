@@ -62,10 +62,16 @@ async function main() {
     employmentType: EmploymentType,
     payrollEligible: boolean,
   ) {
-    // Uniqueness on (tenantId, email) is a partial index — find-then-create, as above.
+    const existingUser = await prisma.user.findFirst({ where: { tenantId: tenant.id, email, deletedAt: null } });
+    if (existingUser) {
+      await prisma.user.update({
+        where: { id: existingUser.id },
+        data: { hourlyRate: employmentType === EmploymentType.INTERN ? null : '1500.00' },
+      });
+    }
     const user =
-      (await prisma.user.findFirst({ where: { tenantId: tenant.id, email, deletedAt: null } })) ??
-      (await prisma.user.create({
+      existingUser ??
+      await prisma.user.create({
         data: {
           tenantId: tenant.id,
           organizationId: org.id,
@@ -78,9 +84,9 @@ async function main() {
           employmentType,
           payrollEligible,
           emailVerifiedAt: new Date(),
-          hourlyRate: employmentType === EmploymentType.INTERN ? null : '25.00',
+          hourlyRate: employmentType === EmploymentType.INTERN ? null : '1500.00',
         },
-      }));
+      });
     // tenantId_key isn't a real Prisma unique either (same partial-index reason).
     const role = await prisma.role.findFirstOrThrow({
       where: { tenantId: tenant.id, key: roleKey, deletedAt: null },

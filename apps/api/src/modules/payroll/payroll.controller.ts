@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Headers,
   HttpCode,
@@ -142,11 +143,14 @@ export class PayrollController {
   // -- Hourly Rate Management (Finance / Admin) --
 
   @Get('rates/:userId')
-  @RequirePermissions('payroll_rate:read')
   getRate(
     @CurrentUser() u: AuthPrincipal,
     @Param('userId', ParseUUIDPipe) userId: string,
   ) {
+    const isAllowedRole = u.roles.some((r) => r === 'FINANCE' || r === 'ADMIN' || r === 'HR' || r === 'SUPERVISOR');
+    if (userId !== u.userId && !isAllowedRole && !u.permissions.includes('payroll_rate:read') && !u.permissions.includes('*')) {
+      throw new ForbiddenException('Missing required permission');
+    }
     return this.svc.getRate(u, userId);
   }
 

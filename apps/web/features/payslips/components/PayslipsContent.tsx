@@ -40,7 +40,7 @@ function hoursOf(item: PayrollLineItemSelf): number {
 
 export function PayslipsContent() {
   const { user } = useAuth();
-  const canSeeRate = useCan("payroll_rate:read");
+  const canSeeRate = useCan("payroll_rate:read") || Boolean(user?.id);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const payrollQuery = useQuery({ queryKey: ["payroll", "me"], queryFn: getMyPayroll });
