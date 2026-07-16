@@ -10,6 +10,7 @@ export interface Me {
   phone: string | null;
   status: string;
   employmentType: string;
+  hourlyRate?: string | number | null;
   departmentId: string | null;
   department: { id: string; name: string } | null;
   organization: { id: string; name: string };

@@ -44,9 +44,12 @@ interface ProfessionalDetailsCardProps {
   selectedDepartmentId?: string;
   selectedEmploymentType?: string;
   selectedSupervisorId?: string;
+  selectedHourlyRate?: string;
+  canEditRate?: boolean;
   onDepartmentChange?: (value: string) => void;
   onEmploymentTypeChange?: (value: string) => void;
   onSupervisorChange?: (value: string) => void;
+  onHourlyRateChange?: (value: string) => void;
 }
 
 export function ProfessionalDetailsCard({
@@ -57,9 +60,12 @@ export function ProfessionalDetailsCard({
   selectedDepartmentId,
   selectedEmploymentType,
   selectedSupervisorId,
+  selectedHourlyRate,
+  canEditRate = false,
   onDepartmentChange,
   onEmploymentTypeChange,
   onSupervisorChange,
+  onHourlyRateChange,
 }: ProfessionalDetailsCardProps) {
   return (
     <SectionCard title="Professional Details">
@@ -141,6 +147,27 @@ export function ProfessionalDetailsCard({
             <Input
               id="supervisor"
               value={me.supervisor ? `${me.supervisor.firstName} ${me.supervisor.lastName}` : "—"}
+              disabled
+            />
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="hourlyRate" className="mb-1.5">Hourly Rate (PHP)</Label>
+          {isEditing && onHourlyRateChange && canEditRate ? (
+            <Input
+              id="hourlyRate"
+              type="number"
+              min="0"
+              step="0.01"
+              value={selectedHourlyRate ?? ""}
+              onChange={(e) => onHourlyRateChange(e.target.value)}
+              placeholder="e.g. 1500.00"
+            />
+          ) : (
+            <Input
+              id="hourlyRate"
+              value={me.hourlyRate != null ? `₱${Number(me.hourlyRate).toFixed(2)}/hr` : "—"}
               disabled
             />
           )}

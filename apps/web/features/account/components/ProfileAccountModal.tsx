@@ -20,6 +20,7 @@ import { PersonalInfoCard } from "./PersonalInfoCard";
 import { ProfessionalDetailsCard } from "./ProfessionalDetailsCard";
 import { SecuritySection } from "./SecuritySection";
 import { apiClient } from "@/lib/api/client";
+import { useAuth } from "@/providers/auth-provider";
 
 interface DepartmentRef {
   id: string;
@@ -33,6 +34,8 @@ export function ProfileAccountModal() {
   const queryClient = useQueryClient();
   const [toast, setToast] = useState<ToastState | null>(null);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
+  const { user } = useAuth();
+  const isAdminOrFinance = user?.roles.some((r) => r === "ADMIN" || r === "FINANCE") || false;
 
   /** null targetUserId = "my own" profile (self-service, full editing incl. avatar/security);
    *  set = an Admin viewing/editing another employee from Employee Management (no avatar/security actions). */
@@ -42,6 +45,7 @@ export function ProfileAccountModal() {
   const [editDepartmentId, setEditDepartmentId] = useState<string>("");
   const [editEmploymentType, setEditEmploymentType] = useState<string>("");
   const [editSupervisorId, setEditSupervisorId] = useState<string>("");
+  const [editHourlyRate, setEditHourlyRate] = useState<string>("");
 
   const meQuery = useQuery({
     queryKey: isViewingOther ? ["employee-management", "employee", targetUserId] : ["account", "me"],
@@ -85,33 +89,50 @@ export function ProfileAccountModal() {
         setEditDepartmentId(meQuery.data.departmentId ?? "");
         setEditEmploymentType(meQuery.data.employmentType ?? "EMPLOYEE");
         setEditSupervisorId(meQuery.data.supervisor?.id ?? "");
+        setEditHourlyRate(meQuery.data.hourlyRate != null ? String(meQuery.data.hourlyRate) : "");
       }
     }
   }, [meQuery.data, reset, isViewingOther]);
 
   const saveProfile = useMutation({
-    mutationFn: (values: ProfileValues) => {
+    mutationFn: async (values: ProfileValues) => {
       const payload = { ...values, phone: values.phone || undefined };
       if (isViewingOther) {
-        const version = (meQuery.data as EmployeeRow).version;
+        let currentVersion = (meQuery.data as EmployeeRow).version;
+        const originalRate = meQuery.data?.hourlyRate != null ? String(meQuery.data.hourlyRate) : "";
+        
+        // If hourly rate changed and viewer has permission, update the rate first
+        if (isAdminOrFinance && editHourlyRate !== originalRate) {
+          const rateVal = parseFloat(editHourlyRate) || 0;
+          const rateRes = await apiClient.patch(`/payroll/rates/${targetUserId}`, null, {
+            params: { rate: rateVal, version: currentVersion },
+          });
+          // The rate update increments the user's version, so we must use the new version for updateEmployee
+          currentVersion = rateRes.data.version;
+        }
+
         return updateEmployee(targetUserId!, {
           ...payload,
           departmentId: editDepartmentId || undefined,
           employmentType: editEmploymentType || undefined,
           supervisorId: editSupervisorId || null,
-          version,
+          version: currentVersion,
         });
       }
       return updateProfile(payload);
     },
     onSuccess: (updated) => {
       queryClient.setQueryData(isViewingOther ? ["employee-management", "employee", targetUserId] : ["account", "me"], updated);
-      if (isViewingOther) queryClient.invalidateQueries({ queryKey: ["employee-management", "employees"] });
+      if (isViewingOther) {
+        queryClient.invalidateQueries({ queryKey: ["employee-management", "employees"] });
+        queryClient.invalidateQueries({ queryKey: ["payroll"] });
+      }
       reset({ firstName: updated.firstName, lastName: updated.lastName, phone: updated.phone ?? "" });
       if (isViewingOther) {
         setEditDepartmentId(updated.departmentId ?? "");
         setEditEmploymentType(updated.employmentType ?? "EMPLOYEE");
         setEditSupervisorId(updated.supervisor?.id ?? "");
+        setEditHourlyRate(updated.hourlyRate != null ? String(updated.hourlyRate) : "");
       }
       setToast({ message: isViewingOther ? "Employee updated." : "Profile updated.", tone: "success" });
       close();
@@ -122,7 +143,7 @@ export function ProfileAccountModal() {
   });
 
   function handleOpenChange(next: boolean) {
-    if (!next && isDirty) {
+    if (!next && (isDirty || professionalDirty)) {
       setConfirmDiscardOpen(true);
       return;
     }
@@ -137,6 +158,7 @@ export function ProfileAccountModal() {
         setEditDepartmentId(meQuery.data.departmentId ?? "");
         setEditEmploymentType(meQuery.data.employmentType ?? "EMPLOYEE");
         setEditSupervisorId(meQuery.data.supervisor?.id ?? "");
+        setEditHourlyRate(meQuery.data.hourlyRate != null ? String(meQuery.data.hourlyRate) : "");
       }
     }
     close();
@@ -147,6 +169,7 @@ export function ProfileAccountModal() {
     ? editDepartmentId !== (meQuery.data.departmentId ?? "")
       || editEmploymentType !== (meQuery.data.employmentType ?? "EMPLOYEE")
       || editSupervisorId !== (meQuery.data.supervisor?.id ?? "")
+      || editHourlyRate !== (meQuery.data.hourlyRate != null ? String(meQuery.data.hourlyRate) : "")
     : false;
 
   return (
@@ -187,9 +210,12 @@ export function ProfileAccountModal() {
                     selectedDepartmentId={editDepartmentId}
                     selectedEmploymentType={editEmploymentType}
                     selectedSupervisorId={editSupervisorId}
+                    selectedHourlyRate={editHourlyRate}
+                    canEditRate={isAdminOrFinance}
                     onDepartmentChange={setEditDepartmentId}
                     onEmploymentTypeChange={setEditEmploymentType}
                     onSupervisorChange={setEditSupervisorId}
+                    onHourlyRateChange={setEditHourlyRate}
                   />
                 </div>
                 {isViewingOther ? null : <SecuritySection me={meQuery.data} onToast={setToast} />}
