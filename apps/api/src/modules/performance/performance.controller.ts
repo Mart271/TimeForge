@@ -21,7 +21,7 @@ export class PerformanceController {
   constructor(private readonly svc: PerformanceService) {}
 
   @Get('dashboard')
-  @RequirePermissions('dashboard:read_team')
+  @RequirePermissions('dashboard:read_self')
   async getDashboard(
     @CurrentUser() u: AuthPrincipal,
     @Query() query: PerformanceQuery,
@@ -30,7 +30,7 @@ export class PerformanceController {
   }
 
   @Get('overview')
-  @RequirePermissions('dashboard:read_team')
+  @RequirePermissions('dashboard:read_self')
   async getOverview(
     @CurrentUser() u: AuthPrincipal,
     @Query() query: PerformanceQuery,
@@ -39,7 +39,7 @@ export class PerformanceController {
   }
 
   @Get('metrics')
-  @RequirePermissions('dashboard:read_team')
+  @RequirePermissions('dashboard:read_self')
   async getMetrics(
     @CurrentUser() u: AuthPrincipal,
     @Query() query: PerformanceQuery,
@@ -48,7 +48,7 @@ export class PerformanceController {
   }
 
   @Get('kpis')
-  @RequirePermissions('kpi:read_org')
+  @RequirePermissions('kpi_progress:read')
   async getKpis(
     @CurrentUser() u: AuthPrincipal,
     @Query() query: PerformanceQuery,
@@ -57,7 +57,7 @@ export class PerformanceController {
   }
 
   @Get('trends')
-  @RequirePermissions('dashboard:read_team')
+  @RequirePermissions('dashboard:read_self')
   async getTrends(
     @CurrentUser() u: AuthPrincipal,
     @Query() query: PerformanceQuery,
@@ -66,7 +66,7 @@ export class PerformanceController {
   }
 
   @Get('history')
-  @RequirePermissions('dashboard:read_team')
+  @RequirePermissions('dashboard:read_self')
   async getHistory(
     @CurrentUser() u: AuthPrincipal,
     @Query() query: PerformanceQuery,
