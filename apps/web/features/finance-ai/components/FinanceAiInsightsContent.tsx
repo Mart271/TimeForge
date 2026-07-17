@@ -116,34 +116,53 @@ export function FinanceAiInsightsContent() {
 
   // ─── Queries ──────────────────────────────────────────────────────────────────
 
+  // These five endpoints are heavy backend aggregations (AI-driven finance
+  // analytics). They all fire on mount, so aggressive polling + no staleTime
+  // made the page hammer a cold Railway instance and re-render 6 recharts charts
+  // on every refetch — which froze the renderer on cold load. staleTime stops
+  // refetch-on-remount storms; only refetch in the background occasionally (and
+  // only while the tab is focused). Same pattern already applied to Finance Reports.
+  const HEAVY_STALE = 5 * 60_000;
+  const HEAVY_POLL = 5 * 60_000;
+
   const { data: dashboard, isLoading: isDashLoading, isError: isDashError, refetch: refetchDash } = useQuery({
     queryKey: ["finance-ai", "dashboard"],
     queryFn: () => getAiDashboard({}),
-    refetchInterval: 60_000,
+    staleTime: HEAVY_STALE,
+    refetchInterval: HEAVY_POLL,
+    refetchIntervalInBackground: false,
   });
 
   const { data: alerts, isLoading: isAlertsLoading, refetch: refetchAlerts } = useQuery({
     queryKey: ["finance-ai", "alerts", alertSeverity, alertCursor],
     queryFn: () => getAiAlerts({ severity: alertSeverity === "ALL" ? undefined : alertSeverity, cursor: alertCursor ?? undefined, limit: 10 }),
-    refetchInterval: 30_000,
+    staleTime: HEAVY_STALE,
+    refetchInterval: HEAVY_POLL,
+    refetchIntervalInBackground: false,
   });
 
   const { data: forecast, isLoading: isForecastLoading } = useQuery({
     queryKey: ["finance-ai", "forecast", forecastPeriod],
     queryFn: () => getAiForecast({ period: forecastPeriod }),
-    refetchInterval: 120_000,
+    staleTime: HEAVY_STALE,
+    refetchInterval: HEAVY_POLL,
+    refetchIntervalInBackground: false,
   });
 
   const { data: budget, isLoading: isBudgetLoading, refetch: refetchBudget } = useQuery({
     queryKey: ["finance-ai", "budget"],
     queryFn: () => getAiBudget({ search: budgetSearch || undefined }),
-    refetchInterval: 120_000,
+    staleTime: HEAVY_STALE,
+    refetchInterval: HEAVY_POLL,
+    refetchIntervalInBackground: false,
   });
 
   const { data: liability, isLoading: isLiabilityLoading } = useQuery({
     queryKey: ["finance-ai", "liability"],
     queryFn: getAiLiability,
-    refetchInterval: 60_000,
+    staleTime: HEAVY_STALE,
+    refetchInterval: HEAVY_POLL,
+    refetchIntervalInBackground: false,
   });
 
   // ─── Mutations ─────────────────────────────────────────────────────────────────
@@ -347,7 +366,7 @@ export function FinanceAiInsightsContent() {
         <SectionCard title="Payroll Validation Flow">
           <div className="flex flex-col gap-4">
             <StageRow name="1. Timesheets" status="completed" progress={100} duration="2.4s" />
-            <StageRow name="2. Validation" status={dashboard?.payrollOversight.processingHealth ?? 0 >= 80 ? "completed" : "in-progress"} progress={dashboard?.payrollOversight.processingHealth ?? 0} duration="1.8s" />
+            <StageRow name="2. Validation" status={(dashboard?.payrollOversight.processingHealth ?? 0) >= 80 ? "completed" : "in-progress"} progress={dashboard?.payrollOversight.processingHealth ?? 0} duration="1.8s" />
             <StageRow name="3. Payroll Calculation" status={(dashboard?.payrollOversight.pendingApprovals ?? 0) > 0 ? "pending" : "in-progress"} progress={(dashboard?.payrollOversight.pendingApprovals ?? 0) > 0 ? 85 : 45} duration="0s" />
             <StageRow name="4. Payroll Processing" status="pending" progress={0} duration="—" />
           </div>
