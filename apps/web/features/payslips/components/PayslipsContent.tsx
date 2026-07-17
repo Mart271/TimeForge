@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getMyPayroll, downloadPayslipPdf, type PayrollLineItemSelf } from "../api/payroll.service";
+import { getMyPayroll, getUserRate, downloadPayslipPdf, type PayrollLineItemSelf } from "../api/payroll.service";
 import { getMe, getTeamPresence } from "@/features/account/api/account.service";
 import { listTimeEntries } from "@/features/time-tracking/api/time-entries.service";
 import { RecentActivityCard } from "./RecentActivityCard";
@@ -48,6 +48,12 @@ export function PayslipsContent() {
   const payrollQuery = useQuery({ queryKey: ["payroll", "me"], queryFn: getMyPayroll });
   const meQuery = useQuery({ queryKey: ["account", "me"], queryFn: getMe });
   const presenceQuery = useQuery({ queryKey: ["account", "team-presence"], queryFn: getTeamPresence });
+
+  const rateQuery = useQuery({
+    queryKey: ["payroll", "rate", user?.id],
+    queryFn: () => getUserRate(user!.id),
+    enabled: Boolean(user?.id),
+  });
 
   const downloadPayslipMutation = useMutation({
     mutationFn: (id: string) => downloadPayslipPdf(id),
@@ -83,7 +89,7 @@ export function PayslipsContent() {
   const selected = items.find((i) => i.id === selectedId) ?? items[0] ?? null;
 
   const accumulatedHours = selected ? hoursOf(selected) : 0;
-  const rate = meQuery.data?.hourlyRate != null ? Number(meQuery.data.hourlyRate) : null;
+  const rate = rateQuery.data?.hourlyRate != null ? Number(rateQuery.data.hourlyRate) : null;
 
   const columns: DataTableColumn<PayrollLineItemSelf>[] = [
     {
