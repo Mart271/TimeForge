@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Clock3, Download, Landmark, Lock, TrendingUp } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Clock3, Download, Landmark, Loader2, Lock, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { MetricCard } from "@/components/shared/MetricCard";
@@ -13,6 +13,7 @@ import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { StatusBadge, payrollStatusTone } from "@/components/shared/StatusBadge";
 import { WeeklyHoursChart, type DayHours } from "@/components/shared/WeeklyHoursChart";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Toast, type ToastState } from "@/components/shared/Toast";
 import {
   Select,
   SelectContent,
@@ -20,35 +21,43 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getMyPayroll, getUserRate, type PayrollLineItemSelf } from "../api/payroll.service";
+import { getMyPayroll, getUserRate, downloadPayslipPdf, type PayrollLineItemSelf } from "../api/payroll.service";
+import { getMe, getTeamPresence } from "@/features/account/api/account.service";
 import { listTimeEntries } from "@/features/time-tracking/api/time-entries.service";
 import { RecentActivityCard } from "./RecentActivityCard";
 import { useCan } from "@/features/auth/rbac";
 import { useAuth } from "@/providers/auth-provider";
 import { formatPeriodRange, minutesBetween, toIsoDate, weekWindow } from "@/lib/time";
 
-const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
+function hoursOf(item: PayrollLineItemSelf): number {
+  return Number(item.approvedHours) + Number(item.overtimeHours);
+}
 
 function periodLabel(item: PayrollLineItemSelf): string {
   const { startDate, endDate } = item.payrollReport.period;
   return formatPeriodRange(new Date(startDate), new Date(endDate));
 }
 
-function hoursOf(item: PayrollLineItemSelf): number {
-  return Number(item.approvedHours) + Number(item.overtimeHours);
-}
-
 export function PayslipsContent() {
   const { user } = useAuth();
-  const canSeeRate = useCan("payroll_rate:read") || Boolean(user?.id);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   const payrollQuery = useQuery({ queryKey: ["payroll", "me"], queryFn: getMyPayroll });
+  const meQuery = useQuery({ queryKey: ["account", "me"], queryFn: getMe });
+  const presenceQuery = useQuery({ queryKey: ["account", "team-presence"], queryFn: getTeamPresence });
 
   const rateQuery = useQuery({
     queryKey: ["payroll", "rate", user?.id],
     queryFn: () => getUserRate(user!.id),
-    enabled: canSeeRate && Boolean(user?.id),
+    enabled: Boolean(user?.id),
+  });
+
+  const downloadPayslipMutation = useMutation({
+    mutationFn: (id: string) => downloadPayslipPdf(id),
+    onError: (err: any) => setToast({ message: err?.message || "Failed to download payslip.", tone: "error" }),
   });
 
   // This week's tracked hours for the chart.
@@ -126,29 +135,26 @@ export function PayslipsContent() {
       key: "action",
       header: "Action",
       className: "text-right",
-      render: () => (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <button
-                type="button"
-                aria-disabled="true"
-                aria-label="Download payslip (unavailable)"
-                onClick={(e) => e.preventDefault()}
-                className="cursor-not-allowed rounded-full p-2 text-brand-muted/50"
-              >
-                <Download className="h-4 w-4" aria-hidden="true" />
-              </button>
-            }
-          />
-          <TooltipContent>Needs backend support — no employee payslip export endpoint.</TooltipContent>
-        </Tooltip>
+      render: (item) => (
+        <button
+          type="button"
+          disabled={downloadPayslipMutation.isPending}
+          onClick={() => downloadPayslipMutation.mutate(item.id)}
+          className="rounded-full p-2 text-brand hover:bg-brand/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {downloadPayslipMutation.isPending && downloadPayslipMutation.variables === item.id ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" aria-hidden="true" />
+          )}
+        </button>
       ),
     },
   ];
 
   return (
     <div className="flex flex-col gap-6">
+      <Toast toast={toast} onDismiss={() => setToast(null)} />
       <PageHeader title="Payslips" subtitle="Your approved hours and payroll history." />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -160,10 +166,34 @@ export function PayslipsContent() {
           )}
         </SectionCard>
         <SectionCard title="Team Status">
-          <EmptyState
-            variant="restricted"
-            message="Needs backend support — there is no team presence API yet."
-          />
+          {presenceQuery.isLoading ? (
+            <p className="text-sm text-brand-muted">Loading…</p>
+          ) : !presenceQuery.data || presenceQuery.data.length === 0 ? (
+            <EmptyState message="No team members in department yet." />
+          ) : (
+            <ul className="flex flex-col divide-y divide-[#c3c6d2]/40">
+              {presenceQuery.data.map((m) => (
+                <li key={m.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <div className="flex flex-col min-w-0">
+                    <span className="truncate text-sm font-medium text-brand-navy">
+                      {m.firstName} {m.lastName}
+                    </span>
+                    {m.jobTitle && (
+                      <span className="truncate text-[11px] text-brand-muted">
+                        {m.jobTitle}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center">
+                    <StatusBadge
+                      label={m.isOnline ? "Clocked In" : "Clocked Out"}
+                      tone={m.isOnline ? "success" : "neutral"}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </SectionCard>
       </div>
 
