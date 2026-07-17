@@ -13,9 +13,9 @@ import {
   DialogCloseButton,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError, FormBanner } from "@/features/auth/components/FormMessages";
+import { PasswordField } from "@/features/auth/components/PasswordField";
 import { ApiError } from "@/lib/api/client";
 import { changePasswordSchema, type ChangePasswordValues } from "../schemas/account.schema";
 import { changePassword } from "../api/account.service";
@@ -82,11 +82,11 @@ export function ChangePasswordDialog({
 
           <div>
             <Label htmlFor="currentPassword" className="mb-1.5">Current Password</Label>
-            <Input
+            <PasswordField
               id="currentPassword"
-              type="password"
               autoComplete="current-password"
-              aria-invalid={Boolean(errors.currentPassword)}
+              invalid={Boolean(errors.currentPassword)}
+              className="h-10 text-sm"
               {...register("currentPassword")}
             />
             <FieldError message={errors.currentPassword?.message} />
@@ -94,11 +94,11 @@ export function ChangePasswordDialog({
 
           <div>
             <Label htmlFor="newPassword" className="mb-1.5">New Password</Label>
-            <Input
+            <PasswordField
               id="newPassword"
-              type="password"
               autoComplete="new-password"
-              aria-invalid={Boolean(errors.newPassword)}
+              invalid={Boolean(errors.newPassword)}
+              className="h-10 text-sm"
               {...register("newPassword")}
             />
             <FieldError message={errors.newPassword?.message} />
@@ -106,11 +106,11 @@ export function ChangePasswordDialog({
 
           <div>
             <Label htmlFor="confirmPassword" className="mb-1.5">Confirm New Password</Label>
-            <Input
+            <PasswordField
               id="confirmPassword"
-              type="password"
               autoComplete="new-password"
-              aria-invalid={Boolean(errors.confirmPassword)}
+              invalid={Boolean(errors.confirmPassword)}
+              className="h-10 text-sm"
               {...register("confirmPassword")}
             />
             <FieldError message={errors.confirmPassword?.message} />
