@@ -146,6 +146,18 @@ export function EmployeeTable({ isAdmin, onToast }: { isAdmin: boolean; onToast:
         title="Employee Directory"
         action={
           <div className="flex items-center gap-2">
+            {isAdmin && selected.size > 0 ? (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={() => setDeactivateConfirmOpen(true)}
+                className="flex items-center gap-1.5"
+              >
+                <UserX className="h-3.5 w-3.5" aria-hidden="true" />
+                Deactivate ({selected.size})
+              </Button>
+            ) : null}
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={

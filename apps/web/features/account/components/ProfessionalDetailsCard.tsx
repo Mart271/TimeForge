@@ -134,7 +134,14 @@ export function ProfessionalDetailsCard({
         <div>
           <Label className="mb-1.5">Supervisor</Label>
           {isEditing && onSupervisorChange ? (
-            <Select value={selectedSupervisorId ?? me.supervisor?.id ?? "NONE"} onValueChange={(v) => onSupervisorChange(v === "NONE" || v === null ? "" : v)}>
+            <Select
+              value={selectedSupervisorId ?? me.supervisor?.id ?? "NONE"}
+              onValueChange={(v) => onSupervisorChange(v === "NONE" || v === null ? "" : v)}
+              items={[
+                { value: "NONE", label: "No supervisor" },
+                ...supervisors.map((s) => ({ value: s.id, label: `${s.firstName} ${s.lastName}` })),
+              ]}
+            >
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="NONE">No supervisor</SelectItem>
