@@ -135,8 +135,25 @@ export class UsersService {
     }
 
     const [page, total] = await Promise.all([Promise.resolve(buildPage(users, limit)), totalPromise]);
+
+    // Live presence: ACTIVE (open session), ON_BREAK (open session with a
+    // running break), or OFFLINE — so the directory distinguishes an employee
+    // who is clocked in from one who is on break.
+    const pageUserIds = page.data.map((u) => u.id);
+    const openSessions = await this.prisma.workSession.findMany({
+      where: { tenantId: caller.tenantId, userId: { in: pageUserIds }, clockOut: null },
+      select: { userId: true, currentBreakStartedAt: true },
+    });
+    const liveByUser = new Map<string, 'ACTIVE' | 'ON_BREAK'>();
+    for (const s of openSessions) {
+      liveByUser.set(s.userId, s.currentBreakStartedAt ? 'ON_BREAK' : 'ACTIVE');
+    }
+
     return {
-      data: page.data.map((u) => this.sanitize(u as unknown as Record<string, unknown>, caller)),
+      data: page.data.map((u) => ({
+        ...this.sanitize(u as unknown as Record<string, unknown>, caller),
+        liveStatus: liveByUser.get(u.id) ?? 'OFFLINE',
+      })),
       page: total !== null ? { ...page.page, total } : page.page,
     };
   }

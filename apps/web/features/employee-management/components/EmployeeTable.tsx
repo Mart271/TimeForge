@@ -275,7 +275,8 @@ export function EmployeeTable({ isAdmin, onToast }: { isAdmin: boolean; onToast:
                   <th className="pb-2 pr-4">Name &amp; Identification</th>
                   <th className="pb-2 pr-4">Role</th>
                   <th className="pb-2 pr-4">Department</th>
-                  <th className="pb-2">Status</th>
+                  <th className="pb-2 pr-4">Status</th>
+                  <th className="pb-2">Activity</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#c3c6d2]/30">
@@ -312,7 +313,23 @@ export function EmployeeTable({ isAdmin, onToast }: { isAdmin: boolean; onToast:
                       </td>
                       <td className="py-2.5 pr-4"><StatusBadge label={roleName} tone="info" /></td>
                       <td className="py-2.5 pr-4 text-brand-muted">{r.department?.name ?? "—"}</td>
-                      <td className="py-2.5"><StatusBadge label={label} tone={tone} /></td>
+                      <td className="py-2.5 pr-4"><StatusBadge label={label} tone={tone} /></td>
+                      <td className="py-2.5">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span
+                            className={`h-2 w-2 rounded-full ${
+                              r.liveStatus === "ACTIVE"
+                                ? "bg-emerald-500"
+                                : r.liveStatus === "ON_BREAK"
+                                  ? "bg-amber-400"
+                                  : "bg-slate-300"
+                            }`}
+                          />
+                          <span className="text-xs text-brand-muted">
+                            {r.liveStatus === "ACTIVE" ? "Active" : r.liveStatus === "ON_BREAK" ? "On Break" : "Offline"}
+                          </span>
+                        </span>
+                      </td>
                     </tr>
                   );
                 })}

@@ -4,6 +4,8 @@ import type { Me } from "@/features/account/api/account.service";
 
 export interface EmployeeRow extends Me {
   status: string;
+  /** Live presence from open work sessions: clocked in, on break, or offline. */
+  liveStatus?: "ACTIVE" | "ON_BREAK" | "OFFLINE";
   version: number;
 }
 
