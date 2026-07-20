@@ -6,6 +6,11 @@ export const OWN_FEATURES = [
   'WEEKLY_SUMMARY',
   'TIMESHEET_SUMMARY',
   'BLOCKER_DETECTION',
+  'STANDUP_DRAFT',
+  'BLOCKER_ADVISORY',
+  'KPI_COPILOT',
+  'INTERN_ADVISORY',
+  'IMPROVE_DESCRIPTION',
 ] as const;
 
 // Features that require TEAM scope (supervisor's team)

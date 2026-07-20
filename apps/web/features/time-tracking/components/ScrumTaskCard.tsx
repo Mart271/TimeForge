@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
+import { useAuth } from "@/providers/auth-provider";
+import { AiScrumDraftPanel } from "@/features/scrum/components/AiScrumDraftPanel";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -93,6 +95,7 @@ interface ScrumTaskCardProps {
 }
 
 export function ScrumTaskCard({ entry, loading, onToast }: ScrumTaskCardProps) {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
@@ -138,6 +141,7 @@ export function ScrumTaskCard({ entry, loading, onToast }: ScrumTaskCardProps) {
     handleSubmit,
     reset,
     getValues,
+    setValue,
     formState: { errors, isDirty },
   } = useForm<DailyScrumValues>({
     resolver: zodResolver(dailyScrumSchema),
@@ -490,7 +494,6 @@ export function ScrumTaskCard({ entry, loading, onToast }: ScrumTaskCardProps) {
         </div>
       </div>
 
-      {/* Completion progress bar with quarter markers */}
       <div>
         <ProgressBar percent={completionPercentage} label="Task completion" />
         <div className="mt-1 flex justify-between text-[10px] font-semibold text-brand-muted/70">
@@ -499,6 +502,19 @@ export function ScrumTaskCard({ entry, loading, onToast }: ScrumTaskCardProps) {
           ))}
         </div>
       </div>
+
+      {!locked && (
+        <AiScrumDraftPanel
+          userId={user?.id ?? ""}
+          onApply={(draft) => {
+            setValue("yesterday", draft.yesterday);
+            setValue("notes", draft.blockers !== "No blockers identified." ? `Blockers Identified: ${draft.blockers}` : "");
+            if (draft.today && draft.today !== "No today activities identified.") {
+              setTaskDesc(draft.today);
+            }
+          }}
+        />
+      )}
 
       {serverError ? <FormBanner message={serverError} /> : null}
       {errors.yesterday?.message || errors.notes?.message ? (

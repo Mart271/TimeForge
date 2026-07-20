@@ -48,3 +48,39 @@ export async function getAiResult(jobId: string): Promise<AiResult | null> {
     throw err;
   }
 }
+
+export async function triggerAiJob(
+  feature: string,
+  subjectType: string,
+  subjectId: string,
+  options?: Record<string, unknown>
+): Promise<{ jobId: string; status: AiJobStatus }> {
+  const { data } = await apiClient.post<{ jobId: string; status: AiJobStatus }>(
+    "/ai/jobs",
+    { feature, subjectType, subjectId, options },
+    { headers: { "Idempotency-Key": crypto.randomUUID() } },
+  );
+  return data;
+}
+
+export async function runAndPollAiJob(
+  feature: string,
+  subjectType: string,
+  subjectId: string,
+  options?: Record<string, unknown>
+): Promise<AiResult> {
+  const { jobId } = await triggerAiJob(feature, subjectType, subjectId, options);
+  
+  for (let i = 0; i < 20; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const job = await getAiJob(jobId);
+    if (job.status === "SUCCEEDED") {
+      const res = await getAiResult(jobId);
+      if (res) return res;
+    }
+    if (job.status === "FAILED") {
+      throw new Error(job.errorMsg || "AI job failed execution");
+    }
+  }
+  throw new Error("AI analysis timed out. Please try again.");
+}

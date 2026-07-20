@@ -26,6 +26,8 @@ import {
   type TimeEntry,
   type TimeEntryAttachment,
 } from "../api/time-entries.service";
+import { useAuth } from "@/providers/auth-provider";
+import { AiImproveTaskButton } from "./AiImproveTaskButton";
 import { workDetailsSchema, type WorkDetailsValues } from "../schemas/time-entry.schema";
 import { type WorkTask } from "../lib/task-select";
 import { ApiError } from "@/lib/api/client";
@@ -57,6 +59,7 @@ const PROFILE_DEPARTMENT = "__profile_department__";
  * URL links still use `referenceLinks`.
  */
 export function WorkDetailsCard({ running, selectedTask, profileDepartmentId, departments, onToast }: WorkDetailsCardProps) {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const [links, setLinks] = useState<string[]>(running?.referenceLinks ?? []);
@@ -91,6 +94,8 @@ export function WorkDetailsCard({ running, selectedTask, profileDepartmentId, de
     handleSubmit,
     control,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<WorkDetailsValues>({
     resolver: zodResolver(workDetailsSchema),
@@ -118,6 +123,9 @@ export function WorkDetailsCard({ running, selectedTask, profileDepartmentId, de
       workCategoryId: selectedTask.workCategoryId ?? "",
     });
   }, [selectedTask, reset]);
+
+  const watchTask = watch("task");
+  const watchWorkDescription = watch("workDescription");
 
   const save = useMutation({
     mutationFn: async (values: WorkDetailsValues) => {
@@ -317,7 +325,14 @@ export function WorkDetailsCard({ running, selectedTask, profileDepartmentId, de
             </p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <FieldLabel htmlFor="wd-task">Task</FieldLabel>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="wd-task" className="text-sm font-medium text-brand-navy">Task</label>
+                  <AiImproveTaskButton
+                    text={watchTask || ""}
+                    onImprove={(val) => setValue("task", val)}
+                    userId={user?.id ?? ""}
+                  />
+                </div>
                 <IconInput
                   id="wd-task"
                   type="text"
@@ -363,7 +378,14 @@ export function WorkDetailsCard({ running, selectedTask, profileDepartmentId, de
             </p>
 
             <div>
-              <FieldLabel htmlFor="wd-workDescription">Work Description</FieldLabel>
+              <div className="flex items-center justify-between mb-1.5">
+                <label htmlFor="wd-workDescription" className="text-sm font-medium text-brand-navy">Work Description</label>
+                <AiImproveTaskButton
+                  text={watchWorkDescription || ""}
+                  onImprove={(val) => setValue("workDescription", val)}
+                  userId={user?.id ?? ""}
+                />
+              </div>
               <Textarea
                 id="wd-workDescription"
                 rows={3}

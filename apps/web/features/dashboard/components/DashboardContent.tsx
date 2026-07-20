@@ -13,6 +13,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardHero } from "./DashboardHero";
 import { WeeklyHoursChart, type DayHours } from "@/components/shared/WeeklyHoursChart";
 import { RecentActivityCard } from "@/features/payslips/components/RecentActivityCard";
+import { AiGoalCopilotCard } from "./AiGoalCopilotCard";
+import { AiInternAdvisoryCard } from "./AiInternAdvisoryCard";
 import { listTimeEntries } from "@/features/time-tracking/api/time-entries.service";
 import { minutesBetween, toIsoDate, weekWindow } from "@/lib/time";
 
@@ -103,6 +105,13 @@ export function DashboardContent() {
         <SectionCard title="Team Status">
           <TeamStatusList isLoading={presenceQuery.isLoading} members={presenceQuery.data} />
         </SectionCard>
+      </div>
+
+      <div className={`grid grid-cols-1 gap-4 ${me?.employmentType === "INTERN" ? "md:grid-cols-2" : ""}`}>
+        <AiGoalCopilotCard userId={me?.id ?? ""} />
+        {me?.employmentType === "INTERN" && (
+          <AiInternAdvisoryCard userId={me.id} />
+        )}
       </div>
 
       <RecentActivityCard />

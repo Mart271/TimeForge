@@ -300,6 +300,105 @@ const payrollValidation: FeatureHandler = async (prisma, ctx) => {
     systemPrompt: `You are a payroll compliance auditor. Check for anomalies, duplicate entries, unusual overtime, and data integrity. Respond with JSON: { "summary": "...", "recommendation": "...", "confidence": 0.0-1.0 }`,
     userPrompt: `Payroll period: ${period.startDate.toISOString().slice(0, 10)} – ${period.endDate.toISOString().slice(0, 10)} | Status: ${period.status} | Type: ${period.type}\n\nLine items (${lines.length}):\n${lines.join('\n')}\n\nPre-flagged anomalies:\n${flags.join('\n') || 'None detected by rule checks.'}`,
   };
+// ─── STANDUP_DRAFT ───────────────────────────────────────────────────────────
+const standupDraft: FeatureHandler = async (prisma, ctx) => {
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+
+  const [entries, lastScrum, user] = await Promise.all([
+    prisma.timeEntry.findMany({
+      where: { tenantId: ctx.tenantId, userId: ctx.subjectId, deletedAt: null, startTime: { gte: startOfToday.toISOString(), lte: endOfToday.toISOString() } },
+      orderBy: { startTime: 'asc' },
+      select: { description: true, project: { select: { name: true } } },
+    }),
+    prisma.scrumEntry.findFirst({
+      where: { tenantId: ctx.tenantId, userId: ctx.subjectId, deletedAt: null },
+      orderBy: { entryDate: 'desc' },
+      select: { today: true },
+    }),
+    prisma.user.findFirst({
+      where: { id: ctx.subjectId, tenantId: ctx.tenantId },
+      select: { firstName: true, lastName: true },
+    }),
+  ]);
+
+  const name = user ? `${user.firstName} ${user.lastName}` : ctx.subjectId;
+  const taskDescriptions = entries.map(e => `[Project: ${e.project?.name ?? 'General'}] ${e.description}`).join('\n');
+  const previousToday = lastScrum?.today ?? 'None';
+
+  return {
+    systemPrompt: `You are an assistant that drafts professional Daily Scrum standups. Respond with JSON: { "summary": "...", "recommendation": "...", "confidence": 0.0-1.0 }. In the "summary" field, write the drafted standup with three distinct sections: 'Yesterday', 'Today', and 'Blockers'. In the 'recommendation' field, write any tips or suggested focus points.`,
+    userPrompt: `Draft a daily scrum standup for employee ${name}.\n\nTasks worked on today (to populate "Today" section):\n${taskDescriptions || 'No tasks logged today.'}\n\nWhat they listed as 'Today' in their last scrum (to populate "Yesterday" section):\n${previousToday}`,
+  };
+};
+
+// ─── BLOCKER_ADVISORY ─────────────────────────────────────────────────────────
+const blockerAdvisory: FeatureHandler = async (prisma, ctx) => {
+  const blockerText = (ctx.options?.blockers as string) || '';
+  const user = await prisma.user.findFirst({
+    where: { id: ctx.subjectId, tenantId: ctx.tenantId },
+    select: { firstName: true, lastName: true },
+  });
+  const name = user ? `${user.firstName} ${user.lastName}` : ctx.subjectId;
+
+  return {
+    systemPrompt: `You are a technical consultant and agile mentor. Analyze the blocker and provide 3 actionable, structured suggestions or steps to resolve it. Respond with JSON: { "summary": "...", "recommendation": "...", "confidence": 0.0-1.0 }. Place the structured suggestions in the "recommendation" field and a summary of the advice in the "summary" field.`,
+    userPrompt: `User ${name} is blocked by:\n"${blockerText}"\n\nProvide troubleshooting steps or advice.`,
+  };
+};
+
+// ─── KPI_COPILOT ─────────────────────────────────────────────────────────────
+const kpiCopilot: FeatureHandler = async (prisma, ctx) => {
+  const progress = await prisma.kpiProgress.findMany({
+    where: { tenantId: ctx.tenantId, userId: ctx.subjectId, deletedAt: null },
+    orderBy: { periodKey: 'desc' },
+    take: 5,
+    include: { kpiTemplate: { select: { name: true, targetValue: true, description: true } } },
+  });
+
+  const kpiRows = progress.map(p => 
+    `KPI: ${p.kpiTemplate.name} | Target: ${p.kpiTemplate.targetValue} | Current: ${p.currentValue} | Period: ${p.periodKey}`
+  ).join('\n');
+
+  return {
+    systemPrompt: `You are a career and performance advisor. Analyze the employee's KPI targets vs actual progress and suggest a practical action checklist to help them hit their targets. Respond with JSON: { "summary": "...", "recommendation": "...", "confidence": 0.0-1.0 }. Place the checklist in the "recommendation" field and a high-level summary in the "summary" field.`,
+    userPrompt: `KPI Progress records:\n${kpiRows || 'No KPI progress recorded yet.'}`,
+  };
+};
+
+// ─── INTERN_ADVISORY ──────────────────────────────────────────────────────────
+const internAdvisory: FeatureHandler = async (prisma, ctx) => {
+  const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+  const [entries, user] = await Promise.all([
+    prisma.scrumEntry.findMany({
+      where: { tenantId: ctx.tenantId, userId: ctx.subjectId, deletedAt: null, entryDate: { gte: since } },
+      orderBy: { entryDate: 'desc' },
+      select: { today: true, blockers: true },
+      take: 5,
+    }),
+    prisma.user.findFirst({
+      where: { id: ctx.subjectId, tenantId: ctx.tenantId },
+      select: { firstName: true, lastName: true },
+    }),
+  ]);
+
+  const scrumText = entries.map(e => `Tasks: ${e.today}${e.blockers ? ` | Blocker: ${e.blockers}` : ''}`).join('\n');
+
+  return {
+    systemPrompt: `You are an intern mentor and technical advisor. Provide supportive feedback, soft skills advice, and suggestions for their tasks. Respond with JSON: { "summary": "...", "recommendation": "...", "confidence": 0.0-1.0 }. Place mentoring advice in the "recommendation" field and high-level summary in the "summary" field.`,
+    userPrompt: `Intern ${user?.firstName ?? ''} has completed the following scrums recently:\n${scrumText || 'No scrum entries yet.'}`,
+  };
+};
+
+// ─── IMPROVE_DESCRIPTION ─────────────────────────────────────────────────────
+const improveDescription: FeatureHandler = async (prisma, ctx) => {
+  const originalText = (ctx.options?.text as string) || '';
+
+  return {
+    systemPrompt: `You are a professional documentation assistant. Rewrite the task description to be clear, descriptive, professional, and outcome-oriented. Respond with JSON: { "summary": "...", "recommendation": "...", "confidence": 0.0-1.0 }. Place the improved, detailed description inside the "recommendation" field, and a brief description of the improvement in the "summary" field.`,
+    userPrompt: `Rewrite this vague task description to be professional and detailed:\n"${originalText}"`,
+  };
 };
 
 // ─── Registry ─────────────────────────────────────────────────────────────────
@@ -313,6 +412,11 @@ const HANDLERS: Record<string, FeatureHandler> = {
   PRODUCTIVITY_INSIGHT: productivityInsight,
   SUPERVISOR_ADVISORY: supervisorAdvisory,
   PAYROLL_VALIDATION:  payrollValidation,
+  STANDUP_DRAFT:       standupDraft,
+  BLOCKER_ADVISORY:    blockerAdvisory,
+  KPI_COPILOT:         kpiCopilot,
+  INTERN_ADVISORY:     internAdvisory,
+  IMPROVE_DESCRIPTION: improveDescription,
 };
 
 export function getFeatureHandler(feature: string): FeatureHandler {
