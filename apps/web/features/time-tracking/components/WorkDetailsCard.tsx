@@ -333,10 +333,10 @@ export function WorkDetailsCard({ running, selectedTask, profileDepartmentId, de
                     userId={user?.id ?? ""}
                   />
                 </div>
-                <IconInput
+                <Textarea
                   id="wd-task"
-                  type="text"
                   placeholder="e.g. UI Refactoring"
+                  rows={2}
                   invalid={Boolean(errors.task)}
                   {...register("task")}
                 />
