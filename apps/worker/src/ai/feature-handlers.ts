@@ -300,6 +300,8 @@ const payrollValidation: FeatureHandler = async (prisma, ctx) => {
     systemPrompt: `You are a payroll compliance auditor. Check for anomalies, duplicate entries, unusual overtime, and data integrity. Respond with JSON: { "summary": "...", "recommendation": "...", "confidence": 0.0-1.0 }`,
     userPrompt: `Payroll period: ${period.startDate.toISOString().slice(0, 10)} – ${period.endDate.toISOString().slice(0, 10)} | Status: ${period.status} | Type: ${period.type}\n\nLine items (${lines.length}):\n${lines.join('\n')}\n\nPre-flagged anomalies:\n${flags.join('\n') || 'None detected by rule checks.'}`,
   };
+};
+
 // ─── STANDUP_DRAFT ───────────────────────────────────────────────────────────
 const standupDraft: FeatureHandler = async (prisma, ctx) => {
   const today = new Date();
