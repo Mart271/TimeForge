@@ -44,7 +44,11 @@ import {
   rejectPayroll,
   sendPayrollToBank,
   type PayrollProcessingStatus,
+  type PayrollEmployee,
 } from "../api/finance-payroll-processing.service";
+import { listTimesheets, type Timesheet } from "@/features/timesheets/api/timesheets.service";
+import { TimesheetWorkDetails } from "@/features/timesheets/components/TimesheetWorkDetails";
+import { timesheetStatusTone } from "@/components/shared/StatusBadge";
 
 const PROCESSING_FLOW: { status: PayrollProcessingStatus; label: string }[] = [
   { status: "DRAFT", label: "Draft" },
@@ -74,6 +78,91 @@ function formatDateTime(iso: string): string {
   });
 }
 
+/**
+ * Finance drill-down: the employee's approved work details for the payroll
+ * period — the same entries the supervisor reviewed, fetched through the
+ * existing timesheet endpoints (Finance holds timesheet:read_org; RBAC is
+ * enforced server-side). Read-only; payroll actions stay unchanged.
+ */
+function EmployeeWorkDetailsModal({
+  employee,
+  periodStart,
+  periodEnd,
+  onClose,
+}: {
+  employee: PayrollEmployee;
+  periodStart: string;
+  periodEnd: string;
+  onClose: () => void;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["finance-payroll-processing", "employee-timesheets", employee.id, periodStart, periodEnd],
+    queryFn: () =>
+      listTimesheets({
+        userId: employee.id,
+        from: periodStart.slice(0, 10),
+        to: periodEnd.slice(0, 10),
+        limit: 20,
+      }),
+  });
+  const sheets: Timesheet[] = data?.data ?? [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
+      <div
+        className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-[16px] bg-white p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-brand-navy">
+              Work Details — {employee.firstName} {employee.lastName}
+            </h3>
+            <p className="text-xs text-brand-muted">
+              {formatDateRange(periodStart, periodEnd)} · {employee.department?.name ?? "No department"}
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="text-xl leading-none text-brand-muted hover:text-brand-navy">
+            &times;
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-16" />
+            <Skeleton className="h-16" />
+          </div>
+        ) : sheets.length === 0 ? (
+          <EmptyState message="No timesheets found for this employee in the selected payroll period." />
+        ) : (
+          <div className="flex flex-col gap-5">
+            {sheets.map((sheet) => (
+              <div key={sheet.id}>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-brand-navy">
+                    {formatDateRange(sheet.periodStart, sheet.periodEnd)}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-brand-muted">
+                      {(sheet.totalMinutes / 60).toFixed(2)} hrs
+                    </span>
+                    <StatusBadge {...timesheetStatusTone(sheet.status)} />
+                  </div>
+                </div>
+                <TimesheetWorkDetails timesheetId={sheet.id} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-4 flex justify-end">
+          <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function FinancePayrollProcessingContent() {
   const queryClient = useQueryClient();
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -101,6 +190,8 @@ export function FinancePayrollProcessingContent() {
   }, [periods, selectedPeriodId]);
 
   const activePeriodId = selectedPeriodId;
+  const activePeriod = periods.find((p) => p.id === activePeriodId) ?? null;
+  const [workDetailsEmp, setWorkDetailsEmp] = useState<PayrollEmployee | null>(null);
 
   const { data: dashboard, isLoading: isDashLoading, isError: isDashError } = useQuery({
     queryKey: ["finance-payroll-processing", "dashboard", activePeriodId],
@@ -398,6 +489,7 @@ export function FinancePayrollProcessingContent() {
                       <th className="py-3 px-4">Gross Payroll</th>
                       <th className="py-3 px-4">Pay Multiplier</th>
                       <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-right">Work Details</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#c3c6d2]/30">
@@ -415,6 +507,16 @@ export function FinancePayrollProcessingContent() {
                         <td className="py-3 px-4 text-brand-ink">{emp.payMultiplier.toFixed(2)}x</td>
                         <td className="py-3 px-4">
                           <StatusBadge label={emp.rowStatus} tone={STATUS_TONE[emp.rowStatus] ?? "neutral"} />
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="xs"
+                            onClick={() => setWorkDetailsEmp(emp)}
+                          >
+                            View
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -559,6 +661,15 @@ export function FinancePayrollProcessingContent() {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {workDetailsEmp && activePeriod ? (
+        <EmployeeWorkDetailsModal
+          employee={workDetailsEmp}
+          periodStart={activePeriod.startDate}
+          periodEnd={activePeriod.endDate}
+          onClose={() => setWorkDetailsEmp(null)}
+        />
       ) : null}
     </div>
   );

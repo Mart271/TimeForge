@@ -89,6 +89,10 @@ export function PayslipsContent() {
   const selected = items.find((i) => i.id === selectedId) ?? items[0] ?? null;
 
   const accumulatedHours = selected ? hoursOf(selected) : 0;
+  
+  // Rate is only restricted if the query failed (e.g., 403 Forbidden).
+  // If the query succeeded but hourlyRate is null, it just means it's not configured.
+  const isRateRestricted = rateQuery.isError;
   const rate = rateQuery.data?.hourlyRate != null ? Number(rateQuery.data.hourlyRate) : null;
 
   const columns: DataTableColumn<PayrollLineItemSelf>[] = [
@@ -110,21 +114,26 @@ export function PayslipsContent() {
     {
       key: "gross",
       header: "Gross Pay",
-      render: (item) =>
-        rate != null ? (
-          `₱${(hoursOf(item) * rate).toFixed(2)}`
-        ) : (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <span className="inline-flex items-center gap-1 text-brand-muted">
-                  <Lock className="h-3.5 w-3.5" aria-hidden="true" /> Restricted
-                </span>
-              }
-            />
-            <TooltipContent>Pay amounts are visible to Finance/Admin only (BR-PAY-06).</TooltipContent>
-          </Tooltip>
-        ),
+      render: (item) => {
+        if (isRateRestricted) {
+          return (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <span className="inline-flex items-center gap-1 text-brand-muted">
+                    <Lock className="h-3.5 w-3.5" aria-hidden="true" /> Restricted
+                  </span>
+                }
+              />
+              <TooltipContent>Pay amounts are visible to Finance/Admin only (BR-PAY-06).</TooltipContent>
+            </Tooltip>
+          );
+        }
+        if (rate == null) {
+          return <span className="text-brand-muted italic">Not Set</span>;
+        }
+        return `₱${(hoursOf(item) * rate).toFixed(2)}`;
+      },
     },
     {
       key: "status",
@@ -241,7 +250,15 @@ export function PayslipsContent() {
               valueSuffix="hrs"
               caption={selected ? periodLabel(selected) : "No payroll line items yet"}
             />
-            {rate != null ? (
+            {isRateRestricted ? (
+              <MetricCard
+                icon={Lock}
+                iconTone="bg-[#e4e2e3] text-brand-muted"
+                label="Base Rate"
+                value="Restricted"
+                caption="Rates are visible to Finance/Admin only."
+              />
+            ) : rate != null ? (
               <MetricCard
                 icon={TrendingUp}
                 label="Base Rate"
@@ -250,14 +267,23 @@ export function PayslipsContent() {
               />
             ) : (
               <MetricCard
-                icon={Lock}
-                iconTone="bg-[#e4e2e3] text-brand-muted"
+                icon={TrendingUp}
+                iconTone="bg-gray-100 text-brand-muted"
                 label="Base Rate"
-                value="Restricted"
-                caption="Rates are visible to Finance/Admin only (BR-PAY-06)."
+                value="Not Set"
+                caption="HR has not configured an hourly rate."
               />
             )}
-            {rate != null ? (
+            
+            {isRateRestricted ? (
+              <MetricCard
+                icon={Lock}
+                iconTone="bg-[#e4e2e3] text-brand-muted"
+                label="Est. Total Payout (Gross)"
+                value="Restricted"
+                caption="Pay amounts are excluded from the employee self-view."
+              />
+            ) : rate != null ? (
               <MetricCard
                 icon={Landmark}
                 label="Est. Total Payout (Gross)"
@@ -266,11 +292,11 @@ export function PayslipsContent() {
               />
             ) : (
               <MetricCard
-                icon={Lock}
-                iconTone="bg-[#e4e2e3] text-brand-muted"
+                icon={Landmark}
+                iconTone="bg-gray-100 text-brand-muted"
                 label="Est. Total Payout (Gross)"
-                value="Restricted"
-                caption="Pay amounts are excluded from the employee self-view."
+                value="Not Set"
+                caption="Cannot calculate without a base rate."
               />
             )}
           </div>
