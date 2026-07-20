@@ -78,6 +78,9 @@ export interface TimesheetDetail extends TimesheetRow {
     task: string | null;
     referenceLinks: string[] | null;
     attachments: { key: string; filename: string; size: number }[] | null;
+    project?: { name: string } | null;
+    client?: { name: string } | null;
+    department?: { name: string } | null;
   }[];
   approvals: {
     id: string;

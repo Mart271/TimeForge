@@ -260,6 +260,11 @@ export class TimesheetsService {
         entries: {
           where: { deletedAt: null },
           orderBy: { startTime: 'asc' },
+          include: {
+            project: { select: { name: true } },
+            client: { select: { name: true } },
+            department: { select: { name: true } },
+          },
         },
         approvals: {
           orderBy: { createdAt: 'desc' },

@@ -187,15 +187,20 @@ export function ReviewDetailPanel({ detail, loading, onSuccess, onToast }: Revie
                     className="w-full text-left p-3 flex items-start gap-3 justify-between hover:bg-slate-50/80 transition-colors"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {isExpanded ? (
                           <ChevronUp className="h-4 w-4 text-brand-muted shrink-0" />
                         ) : (
                           <ChevronDown className="h-4 w-4 text-brand-muted shrink-0" />
                         )}
                         <p className="font-semibold text-sm text-brand-ink truncate">
-                          {entry.task || entry.description || "General Work Output"}
+                          {entry.task || "General Work Output"}
                         </p>
+                        {entry.project?.name && (
+                          <span className="text-[10px] bg-[#1467d6]/10 text-brand px-1.5 py-0.5 rounded font-medium max-w-[120px] truncate">
+                            {entry.project.name}
+                          </span>
+                        )}
                       </div>
                       {entry.deliverables && !isExpanded ? (
                         <p className="text-xs text-brand-muted truncate pl-5 mt-0.5">
@@ -213,7 +218,21 @@ export function ReviewDetailPanel({ detail, loading, onSuccess, onToast }: Revie
 
                   {/* Expanded Details Panel */}
                   {isExpanded && (
-                    <div className="px-8 pb-4 pt-1 flex flex-col gap-3 border-t border-[#c3c6d2]/10 bg-slate-50/20 text-xs text-brand-ink">
+                    <div className="px-8 pb-4 pt-3 flex flex-col gap-3 border-t border-[#c3c6d2]/10 bg-slate-50/20 text-xs text-brand-ink">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-b border-[#c3c6d2]/15 pb-2.5 mb-1.5">
+                        <div>
+                          <span className="font-semibold text-brand-muted block mb-0.5">Project:</span>
+                          <span className="font-medium text-brand-navy">{entry.project?.name || "No Project"}</span>
+                        </div>
+                        <div>
+                          <span className="font-semibold text-brand-muted block mb-0.5">Client:</span>
+                          <span className="font-medium text-brand-navy">{entry.client?.name || "—"}</span>
+                        </div>
+                        <div>
+                          <span className="font-semibold text-brand-muted block mb-0.5">Department:</span>
+                          <span className="font-medium text-brand-navy">{entry.department?.name || "—"}</span>
+                        </div>
+                      </div>
                       {entry.task && (
                         <div>
                           <span className="font-semibold text-brand-muted block mb-0.5">Task Title:</span>

@@ -307,6 +307,8 @@ export function TimesheetsContent() {
         entries={entries}
         overtimeDays={summary.overtimeDays}
         periodDayCount={periodDayCount}
+        timesheetStatus={timesheet?.status}
+        onRefresh={() => timesheetDetailQuery.refetch()}
       />
 
       {/* ── Submit for Approval (human-input: summary, accomplishments, blockers) */}

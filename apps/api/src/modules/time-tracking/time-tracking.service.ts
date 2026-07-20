@@ -147,7 +147,12 @@ export class TimeTrackingService {
   async update(p: AuthPrincipal, id: string, dto: UpdateTimeEntryDto): Promise<TimeEntry> {
     const entry = await this.ownEntry(p, id);
     if (entry.version !== dto.version) throw new ConflictException('Version mismatch');
-    if (entry.timesheetId) throw new ConflictException('Entry is locked by a submitted timesheet');
+    if (entry.timesheetId) {
+      const ts = await this.prisma.timesheet.findFirst({ where: { id: entry.timesheetId } });
+      if (ts && ts.status !== 'DRAFT' && ts.status !== 'REVISION_REQUESTED' && ts.status !== 'REJECTED') {
+        throw new ConflictException('Entry is locked by a submitted timesheet');
+      }
+    }
 
     const start = dto.startTime ? new Date(dto.startTime) : entry.startTime;
     const end = dto.endTime ? new Date(dto.endTime) : entry.endTime;
@@ -179,7 +184,12 @@ export class TimeTrackingService {
   async remove(p: AuthPrincipal, id: string, version: number): Promise<void> {
     const entry = await this.ownEntry(p, id);
     if (entry.version !== version) throw new ConflictException('Version mismatch');
-    if (entry.timesheetId) throw new ConflictException('Entry is locked by a submitted timesheet');
+    if (entry.timesheetId) {
+      const ts = await this.prisma.timesheet.findFirst({ where: { id: entry.timesheetId } });
+      if (ts && ts.status !== 'DRAFT' && ts.status !== 'REVISION_REQUESTED' && ts.status !== 'REJECTED') {
+        throw new ConflictException('Entry is locked by a submitted timesheet');
+      }
+    }
     await this.prisma.timeEntry.update({
       where: { id },
       data: { deletedAt: new Date(), updatedBy: p.userId, version: { increment: 1 } },

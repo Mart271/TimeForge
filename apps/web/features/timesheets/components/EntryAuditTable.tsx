@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { listProjects, listWorkCategories } from "@/features/time-tracking/api/catalog.service";
-import type { TimeEntry } from "@/features/time-tracking/api/time-entries.service";
+import { listProjects, listWorkCategories, listClients } from "@/features/time-tracking/api/catalog.service";
+import { listDepartments } from "@/features/schedules/api/departments-picker.service";
+import { updateTimeEntry, deleteTimeEntry, type TimeEntry } from "@/features/time-tracking/api/time-entries.service";
 import { formatClockTime, formatMinutesClock, minutesBetween, toIsoDate } from "@/lib/time";
+import { Edit2, Trash2, X, Loader2 } from "lucide-react";
 
 const COLLAPSED_ROWS = 6;
 
@@ -16,18 +18,132 @@ interface EntryAuditTableProps {
   /** Days whose totals exceed 8h (rows get an Overtime badge). */
   overtimeDays: Set<string>;
   periodDayCount: number;
+  timesheetStatus?: string;
+  onRefresh?: () => void;
+}
+
+function parseIsoToLocalDate(iso: string): string {
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function parseIsoToLocalTime(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+function combineDateAndTime(dateStr: string, timeStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const [h, min] = timeStr.split(":").map(Number);
+  const date = new Date(y, m - 1, d, h, min, 0, 0);
+  return date.toISOString();
 }
 
 /** "Timesheet Entry Audit" table (Submit Timesheet, Figma 127:2792). */
-export function EntryAuditTable({ entries, overtimeDays, periodDayCount }: EntryAuditTableProps) {
+export function EntryAuditTable({ entries, overtimeDays, periodDayCount, timesheetStatus, onRefresh }: EntryAuditTableProps) {
   const [expanded, setExpanded] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Dialog & Form states
+  const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
+  const [deletingEntry, setDeletingEntry] = useState<TimeEntry | null>(null);
+
+  const [editDate, setEditDate] = useState("");
+  const [editStartTime, setEditStartTime] = useState("");
+  const [editEndTime, setEditEndTime] = useState("");
+  const [editProjectId, setEditProjectId] = useState("");
+  const [editClientId, setEditClientId] = useState("");
+  const [editWorkCategoryId, setEditWorkCategoryId] = useState("");
+  const [editDepartmentId, setEditDepartmentId] = useState("");
+  const [editTask, setEditTask] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editDeliverables, setEditDeliverables] = useState("");
+  const [formError, setFormError] = useState("");
+
   const { data: projects } = useQuery({ queryKey: ["catalog", "projects"], queryFn: listProjects });
+  const { data: clients } = useQuery({ queryKey: ["catalog", "clients"], queryFn: listClients });
+  const { data: departments } = useQuery({ queryKey: ["catalog", "departments"], queryFn: listDepartments });
   const { data: categories } = useQuery({
     queryKey: ["catalog", "work-categories"],
     queryFn: listWorkCategories,
   });
 
+  const startEditing = (e: TimeEntry) => {
+    setEditingEntry(e);
+    setEditDate(parseIsoToLocalDate(e.startTime));
+    setEditStartTime(parseIsoToLocalTime(e.startTime));
+    setEditEndTime(parseIsoToLocalTime(e.endTime));
+    setEditProjectId(e.projectId ?? "");
+    setEditClientId(e.clientId ?? "");
+    setEditWorkCategoryId(e.workCategoryId ?? "");
+    setEditDepartmentId(e.departmentId ?? "");
+    setEditTask(e.task ?? "");
+    setEditDescription(e.description ?? "");
+    setEditDeliverables(e.deliverables ?? "");
+    setFormError("");
+  };
+
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingEntry) return;
+      if (!editDate || !editStartTime) {
+        throw new Error("Date and Start Time are required");
+      }
+      const startTime = combineDateAndTime(editDate, editStartTime);
+      const endTime = editEndTime ? combineDateAndTime(editDate, editEndTime) : undefined;
+      
+      if (endTime && new Date(endTime) <= new Date(startTime)) {
+        throw new Error("End Time must be after Start Time");
+      }
+
+      await updateTimeEntry(editingEntry.id, {
+        startTime,
+        endTime,
+        projectId: editProjectId || undefined,
+        clientId: editClientId || undefined,
+        workCategoryId: editWorkCategoryId || undefined,
+        departmentId: editDepartmentId || undefined,
+        task: editTask || undefined,
+        description: editDescription || undefined,
+        deliverables: editDeliverables || undefined,
+        version: editingEntry.version,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["timesheets"] });
+      queryClient.invalidateQueries({ queryKey: ["time-entries"] });
+      setEditingEntry(null);
+      if (onRefresh) onRefresh();
+    },
+    onError: (err: any) => {
+      setFormError(err.message || "Failed to update entry");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!deletingEntry) return;
+      await deleteTimeEntry(deletingEntry.id, deletingEntry.version);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["timesheets"] });
+      queryClient.invalidateQueries({ queryKey: ["time-entries"] });
+      setDeletingEntry(null);
+      if (onRefresh) onRefresh();
+    },
+    onError: (err: any) => {
+      alert(err.message || "Failed to delete entry");
+    },
+  });
+
   const visible = expanded ? entries : entries.slice(0, COLLAPSED_ROWS);
+  const canEdit = timesheetStatus === "DRAFT" || timesheetStatus === "REJECTED";
 
   const columns: DataTableColumn<TimeEntry>[] = [
     {
@@ -42,6 +158,24 @@ export function EntryAuditTable({ entries, overtimeDays, periodDayCount }: Entry
             {(e.workCategoryId && categories?.find((c) => c.id === e.workCategoryId)?.name) || "General work"}
           </p>
         </div>
+      ),
+    },
+    {
+      key: "client",
+      header: "Client",
+      render: (e) => (
+        <span className="text-sm text-brand-ink">
+          {(e.clientId && clients?.find((c) => c.id === e.clientId)?.name) || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "department",
+      header: "Department",
+      render: (e) => (
+        <span className="text-sm text-brand-ink">
+          {(e.departmentId && departments?.find((d) => d.id === e.departmentId)?.name) || "—"}
+        </span>
       ),
     },
     {
@@ -70,13 +204,13 @@ export function EntryAuditTable({ entries, overtimeDays, periodDayCount }: Entry
     {
       key: "description",
       header: "Description",
-      className: "max-w-[320px]",
+      className: "max-w-[200px]",
       render: (e) => <span className="line-clamp-2 text-brand-ink">{e.description || "—"}</span>,
     },
     {
       key: "deliverables",
       header: "Deliverables",
-      className: "max-w-[280px]",
+      className: "max-w-[200px]",
       render: (e) => <span className="line-clamp-2 text-brand-ink">{e.deliverables || "—"}</span>,
     },
     {
@@ -94,6 +228,35 @@ export function EntryAuditTable({ entries, overtimeDays, periodDayCount }: Entry
         );
       },
     },
+    ...(canEdit
+      ? [
+          {
+            key: "actions",
+            header: "Actions",
+            className: "text-right",
+            render: (e: TimeEntry) => (
+              <div className="flex justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => startEditing(e)}
+                  className="rounded p-1 text-brand hover:bg-[#f6f3f4]"
+                  title="Edit time entry"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeletingEntry(e)}
+                  className="rounded p-1 text-red-600 hover:bg-red-50"
+                  title="Delete time entry"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -124,6 +287,200 @@ export function EntryAuditTable({ entries, overtimeDays, periodDayCount }: Entry
         </button>
       ) : (
         <div className="pb-4" />
+      )}
+
+      {/* Edit Entry Modal */}
+      {editingEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#c3c6d2]/30 pb-3 mb-4">
+              <h3 className="text-lg font-bold text-brand-navy">Edit Time Entry</h3>
+              <button type="button" onClick={() => setEditingEntry(null)} className="text-brand-muted hover:text-brand-ink">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {formError && (
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg p-3">
+                {formError}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-brand-muted block mb-1">Date *</label>
+                  <input
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    className="w-full h-10 rounded-lg border border-[#c3c6d2] px-3 text-sm focus:border-brand outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-brand-muted block mb-1">Start Time *</label>
+                  <input
+                    type="time"
+                    value={editStartTime}
+                    onChange={(e) => setEditStartTime(e.target.value)}
+                    className="w-full h-10 rounded-lg border border-[#c3c6d2] px-3 text-sm focus:border-brand outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-brand-muted block mb-1">End Time</label>
+                  <input
+                    type="time"
+                    value={editEndTime}
+                    onChange={(e) => setEditEndTime(e.target.value)}
+                    className="w-full h-10 rounded-lg border border-[#c3c6d2] px-3 text-sm focus:border-brand outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-brand-muted block mb-1">Client</label>
+                  <select
+                    value={editClientId}
+                    onChange={(e) => setEditClientId(e.target.value)}
+                    className="w-full h-10 rounded-lg border border-[#c3c6d2] px-2 text-sm focus:border-brand outline-none bg-white"
+                  >
+                    <option value="">Select Client...</option>
+                    {clients?.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-brand-muted block mb-1">Project</label>
+                  <select
+                    value={editProjectId}
+                    onChange={(e) => setEditProjectId(e.target.value)}
+                    className="w-full h-10 rounded-lg border border-[#c3c6d2] px-2 text-sm focus:border-brand outline-none bg-white"
+                  >
+                    <option value="">Select Project...</option>
+                    {projects?.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-brand-muted block mb-1">Department</label>
+                  <select
+                    value={editDepartmentId}
+                    onChange={(e) => setEditDepartmentId(e.target.value)}
+                    className="w-full h-10 rounded-lg border border-[#c3c6d2] px-2 text-sm focus:border-brand outline-none bg-white"
+                  >
+                    <option value="">Select Department...</option>
+                    {departments?.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-brand-muted block mb-1">Work Category</label>
+                  <select
+                    value={editWorkCategoryId}
+                    onChange={(e) => setEditWorkCategoryId(e.target.value)}
+                    className="w-full h-10 rounded-lg border border-[#c3c6d2] px-2 text-sm focus:border-brand outline-none bg-white"
+                  >
+                    <option value="">Select Category...</option>
+                    {categories?.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-brand-muted block mb-1">Task Title</label>
+                <input
+                  type="text"
+                  value={editTask}
+                  onChange={(e) => setEditTask(e.target.value)}
+                  placeholder="e.g. UI Refactoring"
+                  className="w-full h-10 rounded-lg border border-[#c3c6d2] px-3 text-sm focus:border-brand outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-brand-muted block mb-1">Work Description</label>
+                <textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  rows={2}
+                  placeholder="Describe the session work..."
+                  className="w-full rounded-lg border border-[#c3c6d2] p-2.5 text-sm focus:border-brand outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-brand-muted block mb-1">Deliverables</label>
+                <textarea
+                  value={editDeliverables}
+                  onChange={(e) => setEditDeliverables(e.target.value)}
+                  rows={2}
+                  placeholder="What tangible output did this session produce?..."
+                  className="w-full rounded-lg border border-[#c3c6d2] p-2.5 text-sm focus:border-brand outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3 border-t border-[#c3c6d2]/30 pt-4">
+              <button
+                type="button"
+                onClick={() => setEditingEntry(null)}
+                disabled={updateMutation.isPending}
+                className="h-10 rounded-lg border border-[#c3c6d2] px-4 text-sm font-semibold text-brand-navy hover:bg-[#f6f3f4] disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => updateMutation.mutate()}
+                disabled={updateMutation.isPending}
+                className="h-10 rounded-lg bg-brand px-5 text-sm font-bold text-white hover:bg-[#1467d6] flex items-center justify-center gap-1.5 disabled:opacity-60"
+              >
+                {updateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-brand-navy mb-2">Delete Time Entry</h3>
+            <p className="text-sm text-brand-muted mb-5 leading-relaxed">
+              Are you sure you want to delete this time entry? This action cannot be undone, and the timesheet totals will be updated automatically.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeletingEntry(null)}
+                disabled={deleteMutation.isPending}
+                className="h-10 rounded-lg border border-[#c3c6d2] px-4 text-sm font-semibold text-brand-navy hover:bg-[#f6f3f4] disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteMutation.mutate()}
+                disabled={deleteMutation.isPending}
+                className="h-10 rounded-lg bg-red-600 px-5 text-sm font-bold text-white hover:bg-red-700 flex items-center justify-center gap-1.5 disabled:opacity-60"
+              >
+                {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Delete Entry
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

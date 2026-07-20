@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api/client";
-import type { Page } from "@/features/time-tracking/api/time-entries.service";
+import type { Page, TimeEntry } from "@/features/time-tracking/api/time-entries.service";
 
 export type TimesheetStatus =
   | "DRAFT"
@@ -49,6 +49,11 @@ export interface TimesheetDetail extends Timesheet {
   /** Newest first — approvals[0] is the action that produced the current status. */
   approvals: TimesheetApproval[];
   kpiProgress?: TimesheetKpiProgress[];
+  entries: (TimeEntry & {
+    project?: { name: string } | null;
+    client?: { name: string } | null;
+    department?: { name: string } | null;
+  })[];
 }
 
 export async function listTimesheets(params: { status?: string; from?: string; to?: string; limit?: number } = {}): Promise<Page<Timesheet>> {
