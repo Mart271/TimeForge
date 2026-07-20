@@ -7,10 +7,17 @@ import { AuthPrincipal } from '../../common/decorators';
 const SCOPED_ACTIONS = [
   'LOGIN',
   'LOGOUT',
+  'APPROVE',
+  'REJECT',
+  'REVISION_REQUEST',
   'PASSWORD_CHANGE',
   'ROLE_CHANGE',
   'PAYROLL_EXPORT',
   'ADMIN_ACTION',
+  'PAYROLL_VALIDATED',
+  'PAYROLL_APPROVED',
+  'PAYROLL_REJECTED',
+  'PAYROLL_SENT_TO_BANK',
 ] as const;
 
 export interface AuditLogsQuery {
@@ -85,7 +92,24 @@ export class AuditLogsService {
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
 
-    return buildPage(rows, limit);
+    // ── Enrich with actor profile ──────────────────────────────────────────
+    // AuditLog has no Prisma relation to User (intentional — audit logs should
+    // be immutable even if users are deleted). Batch-fetch actor profiles here.
+    const actorIds = [...new Set(rows.map((r) => r.actorId).filter(Boolean) as string[])];
+    const actors = actorIds.length > 0
+      ? await this.prisma.user.findMany({
+          where: { id: { in: actorIds }, tenantId },
+          select: { id: true, firstName: true, lastName: true, email: true, jobTitle: true },
+        })
+      : [];
+    const actorMap = new Map(actors.map((a) => [a.id, a]));
+
+    const enriched = rows.map((r) => ({
+      ...r,
+      actor: r.actorId ? (actorMap.get(r.actorId) ?? null) : null,
+    }));
+
+    return buildPage(enriched as unknown as (typeof enriched[number] & { id: string })[], limit);
   }
 
   async findOne(tenantId: string, user: AuthPrincipal, id: string) {
@@ -107,6 +131,14 @@ export class AuditLogsService {
       throw new ForbiddenException('Access to this audit log is restricted');
     }
 
-    return log;
+    // Enrich single record with actor info
+    const actor = log.actorId
+      ? await this.prisma.user.findFirst({
+          where: { id: log.actorId, tenantId },
+          select: { id: true, firstName: true, lastName: true, email: true, jobTitle: true },
+        })
+      : null;
+
+    return { ...log, actor: actor ?? null };
   }
 }

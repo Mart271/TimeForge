@@ -48,7 +48,8 @@ const MENU_CATALOG: MenuItemDef[] = [
   { id: 'finance-reports',      label: 'Financial Reports',     icon: 'bar-chart-3',      route: '/finance/reports',            section: 'FINANCE',  permission: 'payroll:read' },
   { id: 'finance-ai-insights',  label: 'AI Insights',          icon: 'sparkles',         route: '/finance/ai-insights',        section: 'FINANCE',  permission: 'payroll:read' },
   // ── SYSTEM ──
-  { id: 'system-logs',  label: 'System Logs',  icon: 'scroll-text',  route: '/admin/security',     section: 'SYSTEM',           permission: 'audit:read_org' },
+  { id: 'system-logs',   label: 'System Logs',    icon: 'scroll-text',  route: '/admin/audit-logs',   section: 'SYSTEM', permission: 'audit:read_org' },
+  { id: 'security-logs', label: 'Security Logs',  icon: 'shield',       route: '/admin/security',     section: 'SYSTEM', permission: 'audit:read_org' },
   { id: 'ai-config',    label: 'AI Settings',  icon: 'sparkles',     route: '/admin/ai-config',    section: 'SYSTEM',           permission: 'org:read' },
   { id: 'kpi-management', label: 'KPI Management', icon: 'target', route: '/admin/kpi-management', section: 'SYSTEM',         permission: 'kpi_template:update' },
 ];

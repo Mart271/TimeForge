@@ -11,11 +11,24 @@ export type AuditAction =
   | "PASSWORD_CHANGE"
   | "AI_USAGE"
   | "SETTINGS_CHANGE"
-  | "ADMIN_ACTION";
+  | "ADMIN_ACTION"
+  | "PAYROLL_VALIDATED"
+  | "PAYROLL_APPROVED"
+  | "PAYROLL_REJECTED"
+  | "PAYROLL_SENT_TO_BANK";
+
+export interface AuditActor {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  jobTitle: string | null;
+}
 
 export interface AuditLogEntry {
   id: string;
   actorId: string | null;
+  actor: AuditActor | null;
   action: AuditAction;
   entityType: string | null;
   entityId: string | null;
