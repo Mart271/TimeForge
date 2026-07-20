@@ -17,6 +17,7 @@ import { IDEMPOTENCY_TTL_MS } from '../../common/constants';
 import { AuthPrincipal } from '../../common/decorators';
 import { PERMISSIONS } from '@timeforge/shared';
 import { NotificationsService } from '../notifications/notifications.service';
+import { CacheService } from '../../infra/cache.service';
 import { CreatePayrollPeriodDto, ExportPayrollDto, PayrollPeriodQuery } from './dto';
 
 export interface PayrollExportJobData {
@@ -39,8 +40,20 @@ export class PayrollService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly cache: CacheService,
     @InjectQueue('payroll-export') private readonly exportQueue: Queue<PayrollExportJobData>,
   ) {}
+
+  private async invalidateFinanceCache(orgId: string) {
+    await Promise.all([
+      this.cache.del(`finance:dashboard:org:${orgId}`),
+      this.cache.del(`finance:compliance:org:${orgId}`),
+      this.cache.del(`finance:departments:org:${orgId}`),
+      this.cache.del(`finance:trends:org:${orgId}:monthly`),
+      this.cache.del(`finance:trends:org:${orgId}:quarterly`),
+      this.cache.del(`finance:trends:org:${orgId}:yearly`),
+    ]).catch((err) => this.logger.warn(`Failed to clear finance cache: ${err.message}`));
+  }
 
   // -- Idempotency helpers (M2) --
   // Mirrors AdminService/AiService: a resultRef (opaque string) is cached per
@@ -351,6 +364,7 @@ export class PayrollService {
     });
 
     await this.saveIdempotency(p.tenantId, idemKey, report.id);
+    await this.invalidateFinanceCache(p.organizationId);
 
     return report;
   }
@@ -383,6 +397,7 @@ export class PayrollService {
       },
     }).catch(() => {});
 
+    await this.invalidateFinanceCache(p.organizationId);
     return updated;
   }
 
@@ -484,6 +499,7 @@ export class PayrollService {
       ),
     ).catch((err: unknown) => console.error('[PayrollService] Payslip notification fan-out failed:', err));
 
+    await this.invalidateFinanceCache(p.organizationId);
     // MVP: return the report data directly (full async export is post-MVP)
     return {
       reportId: report.id,
@@ -1260,6 +1276,7 @@ export class PayrollService {
     });
 
     await this.saveIdempotency(p.tenantId, idemKey, result.id);
+    await this.invalidateFinanceCache(p.organizationId);
     return { periodId, processingStatus: result.processingStatus };
   }
 
@@ -1306,6 +1323,7 @@ export class PayrollService {
     });
 
     await this.saveIdempotency(p.tenantId, idemKey, result.id);
+    await this.invalidateFinanceCache(p.organizationId);
     return { periodId, processingStatus: result.processingStatus };
   }
 
@@ -1353,6 +1371,7 @@ export class PayrollService {
     });
 
     await this.saveIdempotency(p.tenantId, idemKey, result.id);
+    await this.invalidateFinanceCache(p.organizationId);
     return { periodId, processingStatus: result.processingStatus };
   }
 
@@ -1420,6 +1439,7 @@ export class PayrollService {
       ),
     ).catch((err: unknown) => this.logger.error('Send-to-bank notification fan-out failed:', err));
 
+    await this.invalidateFinanceCache(p.organizationId);
     return { periodId, processingStatus: result.processingStatus };
   }
 

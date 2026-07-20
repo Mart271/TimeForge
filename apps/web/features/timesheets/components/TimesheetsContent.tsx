@@ -89,7 +89,7 @@ export function TimesheetsContent() {
     enabled: Boolean(timesheet?.id),
   });
   const latestRejection = timesheetDetailQuery.data?.approvals.find(
-    (a) => a.resultingState === "REJECTED",
+    (a) => a.resultingState === "REJECTED" || a.resultingState === "REVISION_REQUESTED",
   );
 
   // ── Period-level aggregation ───────────────────────────────────────────────

@@ -28,7 +28,7 @@ export class FinanceService {
       throw new ForbiddenException('Only Finance/Admin can view the finance dashboard');
     }
 
-    const cacheKey = `finance:dashboard`;
+    const cacheKey = `finance:dashboard:org:${p.organizationId}`;
     const cached = await this.cache.get<unknown>(cacheKey);
     if (cached) return cached;
 
@@ -50,7 +50,7 @@ export class FinanceService {
         where: { ...where, payrollEligible: true, status: 'ACTIVE', employmentType: { not: 'INTERN' } },
       }),
       this.prisma.payrollPeriod.count({
-        where: { ...where, status: { in: ['OPEN', 'GENERATED'] } },
+        where: { ...where, status: { in: ['OPEN', 'GENERATED', 'LOCKED'] } },
       }),
       this.prisma.auditLog.count({
         where: { tenantId: p.tenantId, action: 'PAYROLL_EXPORT' },
@@ -103,7 +103,7 @@ export class FinanceService {
       throw new ForbiddenException('Only Finance/Admin can view payroll trends');
     }
 
-    const cacheKey = `finance:trends:${period}`;
+    const cacheKey = `finance:trends:org:${p.organizationId}:${period}`;
     const cached = await this.cache.get<unknown>(cacheKey);
     if (cached) return cached;
 
@@ -229,7 +229,7 @@ export class FinanceService {
       throw new ForbiddenException('Only Finance/Admin can view compliance status');
     }
 
-    const cacheKey = 'finance:compliance';
+    const cacheKey = `finance:compliance:org:${p.organizationId}`;
     const cached = await this.cache.get<unknown>(cacheKey);
     if (cached) return cached;
 
@@ -279,7 +279,7 @@ export class FinanceService {
       throw new ForbiddenException('Only Finance/Admin can view department allocation');
     }
 
-    const cacheKey = 'finance:departments';
+    const cacheKey = `finance:departments:org:${p.organizationId}`;
     const cached = await this.cache.get<unknown>(cacheKey);
     if (cached) return cached;
 

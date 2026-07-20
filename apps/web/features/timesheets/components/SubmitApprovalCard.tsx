@@ -76,10 +76,10 @@ export function SubmitApprovalCard({
             the time spent on official duties during this pay period.
           </p>
 
-          {status === "REJECTED" && rejectionRemark ? (
+          {(status === "REJECTED" || status === "REVISION_REQUESTED") && rejectionRemark ? (
             <div className="mt-3 rounded-[10px] border border-red-200 bg-red-50 px-3 py-2.5">
               <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
-                Supervisor&apos;s Rejection Remarks{rejectionBy ? ` — ${rejectionBy}` : ""}
+                Supervisor&apos;s Remarks{rejectionBy ? ` — ${rejectionBy}` : ""}
               </p>
               <p className="mt-1 text-sm text-red-700">{rejectionRemark}</p>
             </div>
