@@ -194,6 +194,47 @@ export function ReviewDetailPanel({ detail, loading, onSuccess, onToast }: Revie
         </div>
       )}
 
+      {/* KPI Achievements Section */}
+      {detail.kpiProgress && detail.kpiProgress.length > 0 && (
+        <div>
+          <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-muted mb-2">
+            <TrendingUp className="h-4 w-4" />
+            KPI Performance for Period
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {detail.kpiProgress.map((kpi) => {
+              const percent = Math.min(100, Math.round((Number(kpi.currentValue) / Number(kpi.targetValue)) * 100)) || 0;
+              return (
+                <div key={kpi.id} className="rounded-[12px] border border-[#c3c6d2]/40 bg-slate-50/50 p-3.5">
+                  <div className="flex justify-between items-start mb-1.5">
+                    <div>
+                      <p className="font-semibold text-xs text-brand-ink">{kpi.kpiTemplate.name}</p>
+                      <p className="text-[9px] text-brand-muted uppercase tracking-wider">
+                        {kpi.kpiTemplate.period.toLowerCase()} · {kpi.kpiTemplate.metricType}
+                      </p>
+                    </div>
+                    <div className="text-right text-xs">
+                      <span className="font-bold text-brand">{Number(kpi.currentValue).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                      <span className="text-brand-muted"> / {Number(kpi.targetValue).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                      {kpi.kpiTemplate.unit && (
+                        <span className="text-[10px] text-brand-muted ml-0.5">{kpi.kpiTemplate.unit}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+                    <div
+                      className="h-full bg-brand rounded-full transition-all"
+                      style={{ width: `${percent}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-brand-muted mt-1">{percent}% of target achieved</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Approval history log */}
       {detail.approvals.length > 0 && (
         <div>

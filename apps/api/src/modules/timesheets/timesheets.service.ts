@@ -269,7 +269,44 @@ export class TimesheetsService {
     });
     if (!sheet) throw new NotFoundException('Timesheet not found');
     await this.assertCanView(p, sheet.userId);
-    return sheet;
+
+    // Generate all period keys spanning from periodStart to periodEnd
+    const periodKeys = new Set<string>();
+    const start = new Date(sheet.periodStart);
+    const end = new Date(sheet.periodEnd);
+    const current = new Date(start);
+
+    while (current <= end) {
+      periodKeys.add(this.buildPeriodKey('DAILY', current));
+      periodKeys.add(this.buildPeriodKey('WEEKLY', current));
+      periodKeys.add(this.buildPeriodKey('PAYROLL_PERIOD', current));
+      periodKeys.add(this.buildPeriodKey('MONTHLY', current));
+      current.setUTCDate(current.getUTCDate() + 1);
+    }
+
+    const kpiProgress = await this.prisma.kpiProgress.findMany({
+      where: {
+        tenantId: p.tenantId,
+        userId: sheet.userId,
+        periodKey: { in: Array.from(periodKeys) },
+        deletedAt: null,
+      },
+      include: {
+        kpiTemplate: {
+          select: {
+            name: true,
+            metricType: true,
+            period: true,
+            unit: true,
+          },
+        },
+      },
+    });
+
+    return {
+      ...sheet,
+      kpiProgress,
+    };
   }
 
   async findPending(p: AuthPrincipal, query: TimesheetQuery) {
@@ -1182,6 +1219,30 @@ export class TimesheetsService {
       throw new ConflictException(
         `This operation requires DRAFT status; current status is ${sheet.status}`,
       );
+    }
+  }
+
+  private buildPeriodKey(period: string, date: Date): string {
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const d = date.getUTCDate();
+
+    switch (period) {
+      case 'DAILY':
+        return `${y}-${m}-${String(d).padStart(2, '0')}`;
+      case 'WEEKLY': {
+        // ISO week number
+        const startOfYear = new Date(Date.UTC(y, 0, 1));
+        const weekNum = Math.ceil(
+          ((date.getTime() - startOfYear.getTime()) / 86_400_000 + startOfYear.getUTCDay() + 1) / 7,
+        );
+        return `${y}-W${String(weekNum).padStart(2, '0')}`;
+      }
+      case 'PAYROLL_PERIOD':
+        return d <= 15 ? `${y}-${m}-H1` : `${y}-${m}-H2`;
+      case 'MONTHLY':
+      default:
+        return `${y}-${m}`;
     }
   }
 }

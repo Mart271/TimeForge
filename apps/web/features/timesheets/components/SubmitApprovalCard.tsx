@@ -4,11 +4,11 @@ import { useState } from "react";
 import { CalendarClock, Loader2, Send, UsersRound } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge, timesheetStatusTone } from "@/components/shared/StatusBadge";
-import type { Timesheet } from "../api/timesheets.service";
+import type { Timesheet, TimesheetDetail } from "../api/timesheets.service";
 import { useCan } from "@/features/auth/rbac";
 
 interface SubmitApprovalCardProps {
-  timesheet: Timesheet | null;
+  timesheet: TimesheetDetail | Timesheet | null;
   periodEndLabel: string;
   submitting: boolean;
   savingDraft: boolean;
@@ -219,6 +219,57 @@ export function SubmitApprovalCard({
           )}
         </div>
       </div>
+
+      {/* KPI Progress section */}
+      {(() => {
+        const kpiProgress = (timesheet as TimesheetDetail)?.kpiProgress;
+        if (!kpiProgress || kpiProgress.length === 0) return null;
+        return (
+          <div className="mt-6 border-t border-[#c3c6d2]/30 pt-5">
+            <h4 className="text-sm font-bold uppercase tracking-wider text-brand-navy mb-3">
+              KPI Progress for this Period
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {kpiProgress.map((kpi) => {
+                const percent = Math.min(100, Math.round((Number(kpi.currentValue) / Number(kpi.targetValue)) * 100)) || 0;
+                return (
+                  <div key={kpi.id} className="rounded-[12px] border border-[#c3c6d2]/40 bg-white p-3.5 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="font-semibold text-sm text-brand-ink">{kpi.kpiTemplate.name}</p>
+                          <p className="text-[10px] text-brand-muted uppercase tracking-wider mt-0.5">
+                            {kpi.kpiTemplate.period.toLowerCase()} · {kpi.kpiTemplate.metricType}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-sm font-bold text-brand">
+                            {Number(kpi.currentValue).toLocaleString(undefined, { maximumFractionDigits: 2 })} / {Number(kpi.targetValue).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                          </span>
+                          {kpi.kpiTemplate.unit && (
+                            <span className="text-xs text-brand-muted ml-0.5">{kpi.kpiTemplate.unit}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className="h-full bg-brand rounded-full transition-all duration-500"
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between items-center mt-1.5">
+                        <span className="text-xs font-medium text-brand-muted">{percent}% achieved</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

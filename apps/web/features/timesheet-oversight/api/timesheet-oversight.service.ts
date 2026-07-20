@@ -1,6 +1,6 @@
 import { apiClient } from "@/lib/api/client";
 import type { Page } from "@/features/time-tracking/api/time-entries.service";
-import type { Timesheet } from "@/features/timesheets/api/timesheets.service";
+import type { Timesheet, TimesheetKpiProgress } from "@/features/timesheets/api/timesheets.service";
 
 export interface TimesheetRow extends Timesheet {
   user: { firstName: string; lastName: string; department: { name: string } | null };
@@ -86,6 +86,7 @@ export interface TimesheetDetail extends TimesheetRow {
       lastName: string;
     };
   }[];
+  kpiProgress?: TimesheetKpiProgress[];
 }
 
 export async function getPendingTimesheets(query: TimesheetOversightQuery = {}): Promise<Page<TimesheetRow>> {

@@ -30,9 +30,25 @@ export interface TimesheetApproval {
   supervisor: { firstName: string; lastName: string } | null;
 }
 
+export interface TimesheetKpiProgress {
+  id: string;
+  kpiTemplateId: string;
+  userId: string;
+  periodKey: string;
+  currentValue: number;
+  targetValue: number;
+  kpiTemplate: {
+    name: string;
+    metricType: string;
+    period: string;
+    unit: string | null;
+  };
+}
+
 export interface TimesheetDetail extends Timesheet {
   /** Newest first — approvals[0] is the action that produced the current status. */
   approvals: TimesheetApproval[];
+  kpiProgress?: TimesheetKpiProgress[];
 }
 
 export async function listTimesheets(params: { status?: string; from?: string; to?: string; limit?: number } = {}): Promise<Page<Timesheet>> {

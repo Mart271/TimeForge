@@ -86,7 +86,7 @@ export function TimesheetsContent() {
   const timesheetDetailQuery = useQuery({
     queryKey: ["timesheets", "detail", timesheet?.id],
     queryFn: () => getTimesheetDetail(timesheet!.id),
-    enabled: Boolean(timesheet?.id) && timesheet?.status === "REJECTED",
+    enabled: Boolean(timesheet?.id),
   });
   const latestRejection = timesheetDetailQuery.data?.approvals.find(
     (a) => a.resultingState === "REJECTED",
@@ -311,7 +311,7 @@ export function TimesheetsContent() {
 
       {/* ── Submit for Approval (human-input: summary, accomplishments, blockers) */}
       <SubmitApprovalCard
-        timesheet={timesheet}
+        timesheet={timesheetDetailQuery.data ?? timesheet}
         periodEndLabel={period.end.toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
