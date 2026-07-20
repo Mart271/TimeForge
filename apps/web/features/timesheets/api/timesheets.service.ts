@@ -56,7 +56,7 @@ export interface TimesheetDetail extends Timesheet {
   })[];
 }
 
-export async function listTimesheets(params: { status?: string; from?: string; to?: string; limit?: number } = {}): Promise<Page<Timesheet>> {
+export async function listTimesheets(params: { status?: string; from?: string; to?: string; limit?: number; userId?: string } = {}): Promise<Page<Timesheet>> {
   const { data } = await apiClient.get<Page<Timesheet>>("/timesheets", { params });
   return data;
 }

@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { listDepartments } from "@/features/schedules/api/departments-picker.service";
+import { TimesheetWorkDetails } from "@/features/timesheets/components/TimesheetWorkDetails";
 import {
   listHRTimesheets,
   getHRTimesheetStats,
@@ -431,7 +432,7 @@ export function HRTimesheetsContent() {
       {/* Timesheet Detail Modal */}
       {selectedDetail ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setSelectedDetail(null)}>
-          <div className="w-full max-w-lg rounded-[16px] bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-[16px] bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-brand-navy">Timesheet Details</h3>
               <button type="button" onClick={() => setSelectedDetail(null)} className="text-brand-muted hover:text-brand-navy text-xl leading-none">&times;</button>
@@ -486,6 +487,12 @@ export function HRTimesheetsContent() {
                 <p className="text-sm text-brand-ink bg-[#f6f3f4] rounded-[12px] p-3">{selectedDetail.summary}</p>
               </div>
             ) : null}
+            {/* Work details recorded by the employee, as approved by the supervisor —
+                fetched from the existing timesheet detail endpoint (org-read RBAC). */}
+            <div className="mt-4">
+              <p className="text-xs font-semibold text-brand-muted uppercase mb-2">Work Details</p>
+              <TimesheetWorkDetails timesheetId={selectedDetail.id} />
+            </div>
             <div className="mt-4 flex justify-end">
               <Button variant="outline" size="sm" onClick={() => setSelectedDetail(null)}>Close</Button>
             </div>
