@@ -235,7 +235,7 @@ export function PayslipsContent() {
 
         {payrollQuery.isError ? (
           <ErrorState message="Could not load your payroll data." onRetry={() => payrollQuery.refetch()} />
-        ) : payrollQuery.isLoading ? (
+        ) : payrollQuery.isLoading || rateQuery.isLoading ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <Skeleton className="h-32" />
             <Skeleton className="h-32" />
