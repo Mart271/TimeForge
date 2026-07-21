@@ -306,6 +306,8 @@ model User {
   organization          Organization      @relation(fields: [tenantId, organizationId], references: [tenantId, id])
   department            Department?       @relation(fields: [departmentId], references: [id])
   team                  Team?             @relation(fields: [teamId], references: [id])
+  supervisor            User?             @relation("UserSupervisor", fields: [supervisorId], references: [id])
+  subordinates          User[]            @relation("UserSupervisor")
   roles                 UserRole[]
   refreshTokens         RefreshToken[]
   timeEntries           TimeEntry[]

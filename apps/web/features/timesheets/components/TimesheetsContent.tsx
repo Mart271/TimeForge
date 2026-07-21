@@ -11,6 +11,7 @@ import { ErrorState } from "@/components/shared/ErrorState";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { listTimeEntries } from "@/features/time-tracking/api/time-entries.service";
 import { listProjects } from "@/features/time-tracking/api/catalog.service";
+import { getMe } from "@/features/account/api/account.service";
 import {
   attachEntries,
   createTimesheet,
@@ -78,6 +79,9 @@ export function TimesheetsContent() {
   });
 
   const { data: projects } = useQuery({ queryKey: ["catalog", "projects"], queryFn: listProjects });
+  // Already-exposed field (Me.supervisor) — was never wired to this card, which
+  // showed a hardcoded "not exposed by the API yet" placeholder instead.
+  const { data: me } = useQuery({ queryKey: ["account", "me"], queryFn: getMe });
 
   const timesheet: Timesheet | null = timesheetsQuery.data?.data[0] ?? null;
 
@@ -314,6 +318,7 @@ export function TimesheetsContent() {
       {/* ── Submit for Approval (human-input: summary, accomplishments, blockers) */}
       <SubmitApprovalCard
         timesheet={timesheetDetailQuery.data ?? timesheet}
+        supervisorName={me?.supervisor ? `${me.supervisor.firstName} ${me.supervisor.lastName}` : null}
         periodEndLabel={period.end.toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",

@@ -31,7 +31,12 @@ import { UploadService } from '../storage/upload.service';
 import { StorageService } from '../storage/storage.service';
 
 type ProfileUser = Prisma.UserGetPayload<{
-  include: { roles: { include: { role: true } }; department: true; organization: true };
+  include: {
+    roles: { include: { role: true } };
+    department: true;
+    organization: true;
+    supervisor: { select: { id: true; firstName: true; lastName: true; email: true; avatarKey: true } };
+  };
 }>;
 
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
@@ -165,7 +170,12 @@ export class UsersService {
     }
     const user = await this.prisma.user.findFirst({
       where: { id, tenantId: caller.tenantId, deletedAt: null },
-      include: { roles: { include: { role: true } }, department: true, organization: true },
+      include: {
+        roles: { include: { role: true } },
+        department: true,
+        organization: true,
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarKey: true } },
+      },
     });
     if (!user) throw new NotFoundException('User not found');
     const shaped = await this.shapeProfile(user);
@@ -230,7 +240,7 @@ export class UsersService {
 
   /** Flattens department/organization to {id, name} and swaps the raw storage key for a signed avatar URL. */
   private async shapeProfile(user: ProfileUser): Promise<Record<string, unknown>> {
-    const { avatarKey, department, organization, ...rest } = user;
+    const { avatarKey, department, organization, supervisor, ...rest } = user;
     let avatarUrl = null;
     if (avatarKey) {
       try {
@@ -239,10 +249,29 @@ export class UsersService {
         console.error(`[UsersService] Failed to generate signed URL for avatarKey: ${avatarKey}`, err);
       }
     }
+    let supervisorShaped: Record<string, unknown> | null = null;
+    if (supervisor) {
+      let supervisorAvatarUrl = null;
+      if (supervisor.avatarKey) {
+        try {
+          supervisorAvatarUrl = await this.storage.signedUrl(supervisor.avatarKey);
+        } catch (err) {
+          console.error(`[UsersService] Failed to generate signed URL for supervisor avatarKey: ${supervisor.avatarKey}`, err);
+        }
+      }
+      supervisorShaped = {
+        id: supervisor.id,
+        firstName: supervisor.firstName,
+        lastName: supervisor.lastName,
+        email: supervisor.email,
+        avatarUrl: supervisorAvatarUrl,
+      };
+    }
     return {
       ...rest,
       department: department ? { id: department.id, name: department.name } : null,
       organization: { id: organization.id, name: organization.name },
+      supervisor: supervisorShaped,
       avatarUrl,
     };
   }

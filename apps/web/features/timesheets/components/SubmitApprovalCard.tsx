@@ -9,6 +9,11 @@ import { useCan } from "@/features/auth/rbac";
 
 interface SubmitApprovalCardProps {
   timesheet: TimesheetDetail | Timesheet | null;
+  /** The employee's assigned supervisor (Me.supervisor) — who actually reviews
+   *  this timesheet may differ if it's escalated, but this is the right
+   *  default answer to "who approves this" and was already available via
+   *  GET /users/me. */
+  supervisorName?: string | null;
   periodEndLabel: string;
   submitting: boolean;
   savingDraft: boolean;
@@ -35,12 +40,12 @@ function buildSummary(workSummary: string, accomplishments: string, blockers: st
  * Accomplishments, and Blockers here. All three are merged into the single
  * `summary` field that the API accepts — no backend changes required.
  *
- * BACKEND GAP — approving supervisor name and submission deadline are not
- * exposed by the API (approver is resolved team-side at review time, deadlines
- * aren't modelled), so those slots show the period end and an unassigned note.
+ * Submission deadlines aren't modelled in the API, so that slot shows the
+ * period end date instead.
  */
 export function SubmitApprovalCard({
   timesheet,
+  supervisorName,
   periodEndLabel,
   submitting,
   savingDraft,
@@ -93,7 +98,7 @@ export function SubmitApprovalCard({
               <div>
                 <p className="text-xs text-brand-muted">Approving Supervisor</p>
                 <p className="text-sm font-semibold text-brand-ink">
-                  Assigned at review — not exposed by the API yet
+                  {supervisorName ?? "Not yet assigned"}
                 </p>
               </div>
             </div>
