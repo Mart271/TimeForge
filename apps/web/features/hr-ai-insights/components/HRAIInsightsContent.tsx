@@ -32,6 +32,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toast, type ToastState } from "@/components/shared/Toast";
+import { useAuth } from "@/providers/auth-provider";
 import { getHrAiInsights } from "../api/hr-ai-insights.service";
 import type { HrAiInsightsResponse } from "../api/hr-ai-insights.service";
 
@@ -84,6 +85,8 @@ function OversightBar({ status, progress }: { status: string; progress: number }
 export function HRAIInsightsContent() {
   const queryClient = useQueryClient();
   const [toast, setToast] = useState<ToastState | null>(null);
+  const { user } = useAuth();
+  const pageTitle = user?.roles.includes("ADMIN") ? "Admin AI Insights" : "HR AI Insights";
 
   const {
     data: insights,
@@ -110,7 +113,7 @@ export function HRAIInsightsContent() {
         <Toast toast={toast} onDismiss={() => setToast(null)} />
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-brand-navy">HR AI Insights</h1>
+            <h1 className="text-2xl font-bold text-brand-navy">{pageTitle}</h1>
             <p className="text-sm text-brand-muted">AI-powered workforce analytics</p>
           </div>
         </div>
@@ -128,7 +131,7 @@ export function HRAIInsightsContent() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-brand-navy">HR AI Insights</h1>
+          <h1 className="text-2xl font-bold text-brand-navy">{pageTitle}</h1>
           <p className="text-sm text-brand-muted">
             AI-powered workforce analytics
             {s?.activePayrollCycle ? ` for period ending ${formatDateShort(s.activePayrollCycle.endDate)}` : ""}.
