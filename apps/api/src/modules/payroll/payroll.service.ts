@@ -747,10 +747,12 @@ export class PayrollService {
     const colW = [250, 150, 120];
     let x = 40;
     doc.fontSize(10).font('Helvetica-Bold');
+    const earningsHeaderY = doc.y;
     cols.forEach((c, i) => {
-      doc.text(c, x, doc.y, { width: colW[i], lineBreak: false });
+      doc.text(c, x, earningsHeaderY, { width: colW[i], lineBreak: false });
       x += colW[i];
     });
+    doc.y = earningsHeaderY;
     doc.moveDown(0.5);
     doc.font('Helvetica');
     

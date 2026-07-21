@@ -471,10 +471,12 @@ export class ReportsService {
       const drawRow = (vals: string[], isHeader: boolean) => {
         let x = 40;
         doc.font(isHeader ? 'Helvetica-Bold' : 'Helvetica').fontSize(isHeader ? 9 : 8);
+        const rowY = doc.y;
         vals.forEach((v, i) => {
-          doc.text(v, x, doc.y, { width: colW[i], lineBreak: false });
+          doc.text(v, x, rowY, { width: colW[i], lineBreak: false });
           x += colW[i];
         });
+        doc.y = rowY;
         doc.moveDown(0.5);
       };
       drawRow(cols, true);

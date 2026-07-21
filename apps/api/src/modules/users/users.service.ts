@@ -475,10 +475,12 @@ export class UsersService {
       let x = 30;
       if (isHeader) doc.fontSize(9).font('Helvetica-Bold');
       else doc.fontSize(8).font('Helvetica');
+      const rowY = doc.y;
       vals.forEach((v, i) => {
-        doc.text(v, x, doc.y, { width: colW[i], lineBreak: false });
+        doc.text(v, x, rowY, { width: colW[i], lineBreak: false });
         x += colW[i];
       });
+      doc.y = rowY;
       doc.moveDown(0.5);
     };
     drawRow(cols, true);

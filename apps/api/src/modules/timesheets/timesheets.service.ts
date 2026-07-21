@@ -954,7 +954,9 @@ export class TimesheetsService {
       let x = 30;
       if (isHeader) doc.fontSize(8).font('Helvetica-Bold');
       else doc.fontSize(7).font('Helvetica');
-      vals.forEach((v, i) => { doc.text(v, x, doc.y, { width: colW[i], lineBreak: false }); x += colW[i]; });
+      const rowY = doc.y;
+      vals.forEach((v, i) => { doc.text(v, x, rowY, { width: colW[i], lineBreak: false }); x += colW[i]; });
+      doc.y = rowY;
       doc.moveDown(0.4);
     };
     drawRow(cols, true);
@@ -1030,10 +1032,12 @@ export class TimesheetsService {
     const colW = [70, 90, 120, 90, 90, 60];
     let x = 40;
     doc.fontSize(9).font('Helvetica-Bold');
+    const headerY = doc.y;
     cols.forEach((c, i) => {
-      doc.text(c, x, doc.y, { width: colW[i], lineBreak: false });
+      doc.text(c, x, headerY, { width: colW[i], lineBreak: false });
       x += colW[i];
     });
+    doc.y = headerY;
     doc.moveDown(0.5);
     doc.font('Helvetica');
 
@@ -1068,10 +1072,12 @@ export class TimesheetsService {
         doc.addPage();
         x = 40;
         doc.fontSize(9).font('Helvetica-Bold');
+        const pageHeaderY = doc.y;
         cols.forEach((c, i) => {
-          doc.text(c, x, doc.y, { width: colW[i], lineBreak: false });
+          doc.text(c, x, pageHeaderY, { width: colW[i], lineBreak: false });
           x += colW[i];
         });
+        doc.y = pageHeaderY;
         doc.moveDown(0.5);
         doc.font('Helvetica');
         doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke();
