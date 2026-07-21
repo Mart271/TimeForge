@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { SunsetIcon } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -71,6 +71,8 @@ export function TimeTrackingContent() {
   const scrumQuery = useQuery({
     queryKey: ["scrum-entries", "today"],
     queryFn: () => listScrumEntries({ from: toIsoDate(today), to: toIsoDate(today), limit: 1 }),
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   const deepLinkQuery = useQuery({
@@ -96,8 +98,6 @@ export function TimeTrackingContent() {
   }, [entriesQuery.data, runningQuery.data]);
   const weekEntries = useMemo(() => weekQuery.data ?? [], [weekQuery.data]);
   const summary = useMemo(() => summarizeDay(entries), [entries]);
-  const scrumEntry = deepLinkQuery.data ?? scrumQuery.data?.data[0] ?? null;
-  const onBreak = workSessionQuery.data?.onBreak ?? false;
 
   // Supervisor feedback often lands on a *past* day's entry (a supervisor
   // reviews yesterday's scrum today). Normal navigation only loads today's
@@ -109,7 +109,22 @@ export function TimeTrackingContent() {
   const historyQuery = useQuery({
     queryKey: ["scrum-entries", "history"],
     queryFn: () => listScrumEntries({ limit: 30 }),
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
+
+  const scrumEntry = useMemo(() => {
+    const base = deepLinkId ? (deepLinkQuery.data ?? null) : (scrumQuery.data?.data[0] ?? null);
+    if (!base) return null;
+    if (base.supervisorNote?.trim()) return base;
+
+    const noted = (historyQuery.data?.data ?? []).find(
+      (e) => e.id === base.id && e.supervisorNote?.trim(),
+    );
+    return noted ? { ...base, supervisorNote: noted.supervisorNote } : base;
+  }, [deepLinkId, deepLinkQuery.data, scrumQuery.data, historyQuery.data]);
+  const onBreak = workSessionQuery.data?.onBreak ?? false;
+
   const latestFeedbackEntry = useMemo(() => {
     const all = historyQuery.data?.data ?? [];
     return (
@@ -142,6 +157,12 @@ export function TimeTrackingContent() {
   }, [summary.running, onBreak, entries]);
 
   const queryClient = useQueryClient();
+
+  // Always refetch scrum data when opening Daily Scrum so supervisor comments
+  // appear without requiring a notification deep link first.
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["scrum-entries"] });
+  }, [queryClient]);
 
   // If a notification deep link is clicked, it fetches fresh data for that specific
   // entry. When the user later navigates back to the normal view (sidebar), the
