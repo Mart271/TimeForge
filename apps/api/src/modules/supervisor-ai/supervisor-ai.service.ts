@@ -973,68 +973,73 @@ export class SupervisorAiService {
       const chunks: Buffer[] = [];
       doc.on('data', (chunk) => chunks.push(chunk));
 
-      doc.fontSize(20).text('AI Insights Report', { align: 'center' });
-      doc.fontSize(10).text(`Generated ${new Date().toLocaleString()}`, { align: 'center' });
+      const LEFT = doc.page.margins.left;
+      const RIGHT = doc.page.width - doc.page.margins.right;
+      const BOTTOM = doc.page.height - doc.page.margins.bottom;
+
+      /** Section header with its own rule line — starts a new page if it
+       *  wouldn't otherwise fit with at least one line of body text under it,
+       *  so a heading never gets stranded alone at the bottom of a page. */
+      const sectionHeader = (title: string) => {
+        if (doc.y > BOTTOM - 70) doc.addPage();
+        doc.fontSize(14).font('Helvetica-Bold').fillColor('#0f172a').text(title, LEFT);
+        const ruleY = doc.y + 2;
+        doc.moveTo(LEFT, ruleY).lineTo(RIGHT, ruleY).strokeColor('#c3c6d2').lineWidth(1).stroke();
+        doc.moveDown(0.7);
+        doc.fillColor('black').fontSize(10).font('Helvetica');
+      };
+
+      /** Keeps a title+body block together — moves to a new page first if the
+       *  block would otherwise straddle a page break mid-item. */
+      const entry = (title: string, lines: string[], estLines = lines.length + 1) => {
+        if (doc.y > BOTTOM - estLines * 14) doc.addPage();
+        doc.font('Helvetica-Bold').text(title, LEFT, doc.y, { width: RIGHT - LEFT });
+        doc.font('Helvetica');
+        for (const line of lines) doc.text(line, LEFT + 12, doc.y, { width: RIGHT - LEFT - 12 });
+        doc.moveDown(0.6);
+      };
+
+      doc.fontSize(20).font('Helvetica-Bold').text('AI Insights Report', { align: 'center' });
+      doc.fontSize(10).font('Helvetica').text(`Generated ${new Date().toLocaleString()}`, { align: 'center' });
       doc.moveDown(1.5);
 
-      doc.fontSize(14).font('Helvetica-Bold').text('Summary');
-      doc.moveDown(0.3);
-      doc.fontSize(10).font('Helvetica');
-      doc.text(`Avg Team Performance: ${dashboard.summaryCards.avgTeamPerformance.value}`);
-      doc.text(`AI Automations: ${dashboard.summaryCards.aiAutomations.value}`);
-      doc.text(`Active Risks: ${dashboard.summaryCards.activeRisks.value}`);
-      doc.text(`Productivity Improvement: ${dashboard.summaryCards.productivityImprovement.value}`);
-      doc.text(`Team Health Score: ${dashboard.summaryCards.teamHealthScore.value}`);
+      sectionHeader('Summary');
+      doc.text(`Avg Team Performance: ${dashboard.summaryCards.avgTeamPerformance.value}`, LEFT);
+      doc.text(`AI Automations: ${dashboard.summaryCards.aiAutomations.value}`, LEFT);
+      doc.text(`Active Risks: ${dashboard.summaryCards.activeRisks.value}`, LEFT);
+      doc.text(`Productivity Improvement: ${dashboard.summaryCards.productivityImprovement.value}`, LEFT);
+      doc.text(`Team Health Score: ${dashboard.summaryCards.teamHealthScore.value}`, LEFT);
       doc.moveDown(1);
 
-      doc.fontSize(14).font('Helvetica-Bold').text('AI Coach Insights');
-      doc.moveDown(0.3);
-      doc.fontSize(10).font('Helvetica');
-      if (insights.insights.length === 0) doc.text('No insights available.');
-      insights.insights.forEach((i) => {
-        doc.font('Helvetica-Bold').text(`${i.title} (${i.priority})`);
-        doc.font('Helvetica').text(i.description);
-        doc.text(`Suggested action: ${i.suggestedAction}`);
-        doc.moveDown(0.5);
-      });
-      doc.moveDown(0.5);
+      sectionHeader('AI Coach Insights');
+      if (insights.insights.length === 0) doc.text('No insights available.', LEFT);
+      insights.insights.forEach((i) => entry(`${i.title} (${i.priority})`, [i.description, `Suggested action: ${i.suggestedAction}`]));
+      doc.moveDown(0.4);
 
-      doc.fontSize(14).font('Helvetica-Bold').text('Recommendations');
-      doc.moveDown(0.3);
-      doc.fontSize(10).font('Helvetica');
-      if (recommendations.recommendations.length === 0) doc.text('No recommendations available.');
-      recommendations.recommendations.forEach((r) => {
-        doc.font('Helvetica-Bold').text(`${r.title}${r.employeeName ? ` — ${r.employeeName}` : ''}`);
-        doc.font('Helvetica').text(r.description);
-        doc.text(`Expected impact: ${r.expectedImpact}`);
-        doc.moveDown(0.5);
-      });
-      doc.moveDown(0.5);
+      sectionHeader('Recommendations');
+      if (recommendations.recommendations.length === 0) doc.text('No recommendations available.', LEFT);
+      recommendations.recommendations.forEach((r) =>
+        entry(`${r.title}${r.employeeName ? ` — ${r.employeeName}` : ''}`, [r.description, `Expected impact: ${r.expectedImpact}`]),
+      );
+      doc.moveDown(0.4);
 
-      doc.fontSize(14).font('Helvetica-Bold').text('Team Health');
+      sectionHeader('Team Health');
+      doc.text(`Overall Health Score: ${teamHealth.overallHealthScore}% (${teamHealth.riskLevel} risk)`, LEFT);
+      doc.text(teamHealth.aiSummary, LEFT);
       doc.moveDown(0.3);
-      doc.fontSize(10).font('Helvetica');
-      doc.text(`Overall Health Score: ${teamHealth.overallHealthScore}% (${teamHealth.riskLevel} risk)`);
-      doc.text(teamHealth.aiSummary);
-      teamHealth.scores.forEach((s) => doc.text(`- ${s.label}: ${s.value} (target ${s.target})`));
+      teamHealth.scores.forEach((s) => doc.text(`•  ${s.label}: ${s.value} (target ${s.target})`, LEFT + 12));
       doc.moveDown(1);
 
-      doc.fontSize(14).font('Helvetica-Bold').text('Trends');
-      doc.moveDown(0.3);
-      doc.fontSize(10).font('Helvetica');
-      doc.text(`Total Hours: ${trends.summary.totalHours} | Total Tasks: ${trends.summary.totalTasks} | Avg Focus Time: ${trends.summary.avgFocusTime}% | Team Velocity: ${trends.summary.teamVelocity}`);
+      sectionHeader('Trends');
+      doc.text(`Total Hours: ${trends.summary.totalHours}`, LEFT);
+      doc.text(`Total Tasks: ${trends.summary.totalTasks}`, LEFT);
+      doc.text(`Avg Focus Time: ${trends.summary.avgFocusTime}%`, LEFT);
+      doc.text(`Team Velocity: ${trends.summary.teamVelocity}`, LEFT);
       doc.moveDown(1);
 
-      doc.fontSize(14).font('Helvetica-Bold').text('Alerts');
-      doc.moveDown(0.3);
-      doc.fontSize(10).font('Helvetica');
-      if (alerts.alerts.length === 0) doc.text('No active alerts.');
-      alerts.alerts.forEach((a) => {
-        doc.font('Helvetica-Bold').text(`${a.title} (${a.severity})`);
-        doc.font('Helvetica').text(a.message);
-        doc.text(`Suggested action: ${a.suggestedAction}`);
-        doc.moveDown(0.5);
-      });
+      sectionHeader('Alerts');
+      if (alerts.alerts.length === 0) doc.text('No active alerts.', LEFT);
+      alerts.alerts.forEach((a) => entry(`${a.title} (${a.severity})`, [a.message, `Suggested action: ${a.suggestedAction}`]));
 
       doc.end();
 
