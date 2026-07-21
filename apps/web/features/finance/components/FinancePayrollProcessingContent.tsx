@@ -16,7 +16,6 @@ import {
   FileSpreadsheet,
   Download,
   History,
-  DollarSign,
   Users,
   Receipt,
   ShieldCheck,
@@ -25,6 +24,7 @@ import {
 import { SectionCard } from "@/components/shared/SectionCard";
 import { StatusBadge, type BadgeTone } from "@/components/shared/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { PesoIcon } from "@/components/shared/PesoIcon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toast, type ToastState } from "@/components/shared/Toast";
 import { Button } from "@/components/ui/button";
@@ -464,7 +464,7 @@ export function FinancePayrollProcessingContent() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-[16px] border border-[#c3c6d2]/50 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2 text-brand-muted">
-                <DollarSign className="h-5 w-5" />
+                <PesoIcon className="h-5 w-5" />
                 <span className="text-sm">Gross Payroll</span>
               </div>
               <p className="mt-2 text-2xl font-bold text-brand-ink">{formatCurrency(grossPayroll)}</p>

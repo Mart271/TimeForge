@@ -8,7 +8,6 @@ import {
   TrendingDown,
   RefreshCw,
   Download,
-  DollarSign,
   BarChart3,
   Shield,
   AlertTriangle,
@@ -50,6 +49,7 @@ import { SectionCard } from "@/components/shared/SectionCard";
 import { Toast, type ToastState } from "@/components/shared/Toast";
 import { ProgressBar } from "@/components/shared/ProgressBar";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { PesoIcon } from "@/components/shared/PesoIcon";
 import {
   getAiDashboard,
   getAiAlerts,
@@ -422,7 +422,7 @@ export function FinanceAiInsightsContent() {
                   )}>
                     {alert.type === "COMPLIANCE_RISK" ? <Shield className="h-4 w-4" /> :
                      alert.type === "OVERTIME_ANOMALY" ? <Clock className="h-4 w-4" /> :
-                     alert.type === "BUDGET_THRESHOLD" ? <DollarSign className="h-4 w-4" /> :
+                     alert.type === "BUDGET_THRESHOLD" ? <PesoIcon className="h-4 w-4" /> :
                      alert.type === "PAYROLL_ERROR" ? <AlertTriangle className="h-4 w-4" /> :
                      <Sparkles className="h-4 w-4" />}
                   </div>

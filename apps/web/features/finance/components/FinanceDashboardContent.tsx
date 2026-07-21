@@ -7,7 +7,6 @@ import {
   Users,
   Clock,
   TrendingUp,
-  DollarSign,
   ArrowUpRight,
   ArrowDownRight,
   Activity,
@@ -38,6 +37,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { PesoIcon } from "@/components/shared/PesoIcon";
 import { Toast, type ToastState } from "@/components/shared/Toast";
 import {
   getFinanceDashboard,
@@ -185,7 +185,7 @@ export function FinanceDashboardContent() {
               subtitle={`${dashboard.payrollCompletion.completed} of ${dashboard.payrollCompletion.total} periods`}
             />
             <SummaryCard
-              icon={DollarSign}
+              icon={PesoIcon}
               label="Estimated Cost"
               value={formatCurrency(dashboard.estimatedCost.value)}
             />

@@ -14,7 +14,6 @@ import {
   UserCheck,
   Shield,
   FileText,
-  DollarSign,
   ArrowUpRight,
   Trash2,
   Play,
@@ -48,6 +47,7 @@ import { SectionCard } from "@/components/shared/SectionCard";
 import { Toast, type ToastState } from "@/components/shared/Toast";
 import { ProgressBar } from "@/components/shared/ProgressBar";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { PesoIcon } from "@/components/shared/PesoIcon";
 import {
   getFinanceDashboard,
   getFinancePayrollReport,
@@ -277,7 +277,7 @@ export function FinanceReportsContent() {
                   previous={dashboard.attendance.previous}
                 />
                 <DashboardCard
-                  icon={DollarSign}
+                  icon={PesoIcon}
                   label="Labor Cost"
                   value={formatCurrency(dashboard.laborCost.value)}
                   change={dashboard.laborCost.change}
@@ -455,7 +455,7 @@ export function FinanceReportsContent() {
                     className="justify-between w-full"
                     onClick={() => generateMutation.mutate("PAYROLL")}
                   >
-                    <span className="flex items-center gap-2"><DollarSign className="h-4 w-4 text-brand" /> Payroll Summary</span>
+                    <span className="flex items-center gap-2"><PesoIcon className="h-4 w-4 text-brand" /> Payroll Summary</span>
                     <Download className="h-3.5 w-3.5 text-brand-muted" />
                   </Button>
                   <Button

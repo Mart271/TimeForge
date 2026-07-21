@@ -14,7 +14,6 @@ import {
   UserCheck,
   Shield,
   FileText,
-  DollarSign,
   ArrowUpRight,
   Trash2,
   Play,
@@ -25,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge, type BadgeTone } from "@/components/shared/StatusBadge";
 import { Toast, type ToastState } from "@/components/shared/Toast";
 import { ProgressBar } from "@/components/shared/ProgressBar";
+import { PesoIcon } from "@/components/shared/PesoIcon";
 import { 
   getReportsDashboard, 
   getReportsHistory, 
@@ -346,7 +346,7 @@ export function ReportsDashboardContent() {
             <h3 className="text-xs font-bold text-brand-navy uppercase tracking-wider mb-3">Quick Export Actions</h3>
             <div className="flex flex-col gap-2">
               <Button variant="outline" onClick={() => generateMutation.mutate("PAYROLL")} className="justify-between w-full h-11 text-xs font-bold text-brand-navy border-gray-200">
-                <span className="flex items-center gap-2"><DollarSign className="h-4 w-4 text-[#0052cc]" /> Monthly Financial</span>
+                <span className="flex items-center gap-2"><PesoIcon className="h-4 w-4 text-[#0052cc]" /> Monthly Financial</span>
                 <Download className="h-3.5 w-3.5 text-brand-muted" />
               </Button>
               <Button variant="outline" onClick={() => generateMutation.mutate("COMPLIANCE")} className="justify-between w-full h-11 text-xs font-bold text-brand-navy border-gray-200">

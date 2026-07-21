@@ -1,8 +1,8 @@
-import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface MetricCardProps {
-  icon?: LucideIcon;
+  /** Any icon component accepting a `className` prop — lucide icons or a custom SVG (e.g. PesoIcon). */
+  icon?: React.FC<{ className?: string }>;
   /** Tint behind the icon box, e.g. "bg-brand-cyan/15 text-brand". */
   iconTone?: string;
   label: string;

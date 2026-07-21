@@ -1,9 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Clock3, DollarSign, Download, Users, Wallet } from "lucide-react";
+import { Clock3, Download, Users, Wallet } from "lucide-react";
 import { MetricCard } from "@/components/shared/MetricCard";
 import { SectionCard } from "@/components/shared/SectionCard";
+import { PesoIcon } from "@/components/shared/PesoIcon";
 import { getProductivitySummary } from "../api/supervisor-dashboard.service";
 
 export function ProductivityReportCard() {
@@ -51,7 +52,7 @@ export function ProductivityReportCard() {
           value={isLoading ? "…" : data?.payrollStatus ?? "—"}
         />
         <MetricCard
-          icon={DollarSign}
+          icon={PesoIcon}
           iconTone="bg-amber-50 text-amber-600"
           label="Overtime"
           value={
@@ -63,7 +64,7 @@ export function ProductivityReportCard() {
           }
           caption={
             data?.overtimeCost === null
-              ? "Dollar cost requires Finance/Admin access"
+              ? "Cost requires Finance/Admin access"
               : undefined
           }
         />

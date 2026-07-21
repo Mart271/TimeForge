@@ -6,10 +6,9 @@ import {
   Calendar, 
   Search, 
   ArrowUpRight, 
-  Download, 
-  Loader2, 
-  DollarSign, 
-  CheckCircle2, 
+  Download,
+  Loader2,
+  CheckCircle2,
   AlertCircle,
   FileText,
   Trash2
@@ -26,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Toast, type ToastState } from "@/components/shared/Toast";
 import { StatusBadge, type BadgeTone } from "@/components/shared/StatusBadge";
+import { PesoIcon } from "@/components/shared/PesoIcon";
 import { useAuth } from "@/providers/auth-provider";
 
 export function TeamProductivityReportContent() {
@@ -239,7 +239,7 @@ export function TeamProductivityReportContent() {
             </div>
           </div>
           <div className="h-10 w-10 rounded-full bg-sky-50 text-[#0052cc] flex items-center justify-center">
-            <DollarSign className="h-5 w-5 fill-current" />
+            <PesoIcon className="h-5 w-5" />
           </div>
         </div>
 
