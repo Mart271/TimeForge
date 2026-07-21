@@ -149,9 +149,13 @@ export function FinanceReportsContent() {
 
   const downloadMutation = useMutation({
     mutationFn: (id: string) => auditDownloadReport(id),
-    onSuccess: () => {
+    onSuccess: (data) => {
       setToast({ message: "Report download logged.", tone: "success" });
       refetchHistory();
+      if (data.filePath) {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
+        window.open(`${baseUrl}/api/v1/storage/${data.filePath}`, "_blank");
+      }
     },
     onError: (err: any) => {
       setToast({ message: err?.message || "Download failed.", tone: "error" });
