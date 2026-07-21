@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { runAndPollAiJob } from "@/features/scrum-management/api/ai-insight.service";
+import { AiFormattedText } from "@/components/shared/AiFormattedText";
 
 type RecapKind = "DAILY_SUMMARY" | "WEEKLY_SUMMARY";
 
@@ -64,13 +65,9 @@ export function AiRecapCard({ userId }: AiRecapCardProps) {
           <p className="text-xs font-bold uppercase tracking-wide text-brand-muted">
             {result.kind === "DAILY_SUMMARY" ? "Scrum recap — last 7 days" : "Weekly summary"}
           </p>
-          <p className="whitespace-pre-wrap rounded-[12px] border border-[#c3c6d2]/40 bg-[#f6f3f4]/40 p-3.5 leading-relaxed">
-            {result.summary}
-          </p>
+          <AiFormattedText text={result.summary} className="rounded-[12px] border border-[#c3c6d2]/40 bg-[#f6f3f4]/40 p-3.5 leading-relaxed" />
           {result.recommendation ? (
-            <p className="whitespace-pre-wrap rounded-[12px] border border-brand/20 bg-brand-cyan/5 p-3.5 leading-relaxed">
-              {result.recommendation}
-            </p>
+            <AiFormattedText text={result.recommendation} className="rounded-[12px] border border-brand/20 bg-brand-cyan/5 p-3.5 leading-relaxed" />
           ) : null}
         </div>
       ) : (

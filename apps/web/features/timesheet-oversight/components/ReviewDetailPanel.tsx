@@ -9,6 +9,7 @@ import { ApiError } from "@/lib/api/client";
 import { approveTimesheet, rejectTimesheet, requestRevisionTimesheet, type TimesheetDetail } from "../api/timesheet-oversight.service";
 import { getAttachmentSignedUrl } from "../../time-tracking/api/time-entries.service";
 import { runAndPollAiJob } from "@/features/scrum-management/api/ai-insight.service";
+import { AiFormattedText } from "@/components/shared/AiFormattedText";
 
 interface ReviewDetailPanelProps {
   detail: TimesheetDetail | null;
@@ -199,13 +200,15 @@ export function ReviewDetailPanel({ detail, loading, onSuccess, onToast }: Revie
       {aiSummary ? (
         <div className="rounded-[12px] border border-brand/25 bg-brand-cyan/5 p-4 text-sm text-brand-ink">
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 space-y-2">
+            <div className="min-w-0 space-y-3">
               <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-brand">
                 <Sparkles className="h-3.5 w-3.5" /> AI Timesheet Summary
               </p>
-              <p className="whitespace-pre-wrap leading-relaxed">{aiSummary.summary}</p>
+              <AiFormattedText text={aiSummary.summary} className="leading-relaxed" />
               {aiSummary.recommendation ? (
-                <p className="whitespace-pre-wrap leading-relaxed text-brand-muted">{aiSummary.recommendation}</p>
+                <div className="rounded-lg border border-brand/15 bg-white/60 p-3">
+                  <AiFormattedText text={aiSummary.recommendation} className="leading-relaxed text-brand-muted" />
+                </div>
               ) : null}
             </div>
             <button

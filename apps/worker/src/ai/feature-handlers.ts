@@ -112,7 +112,7 @@ const timesheetSummary: FeatureHandler = async (prisma, ctx) => {
   ).join('\n');
 
   return {
-    systemPrompt: `You are a timesheet auditor. Respond with JSON: { "summary": "...", "recommendation": "...", "confidence": 0.0-1.0 }`,
+    systemPrompt: `You are a timesheet auditor helping a supervisor review quickly. Respond with JSON: { "summary": "...", "recommendation": "...", "confidence": 0.0-1.0 }. Format both fields as short markdown bullet points (one fact per line, each starting with "- "), NOT dense paragraphs. In "summary": 3-5 bullets covering total hours, main projects/tasks, and anything unusual (test data, fragmented or zero-hour entries, missing detail). In "recommendation": a one-line verdict starting with "**Verdict:**" (Approve / Request revision / Reject) followed by 1-3 action bullets.`,
     userPrompt: `Summarise timesheet for ${name}. Period: ${timesheet.periodStart.toISOString().slice(0, 10)} – ${timesheet.periodEnd.toISOString().slice(0, 10)}. Total: ${hours}h. Status: ${timesheet.status}.\n\nEntries:\n${entries || 'None'}`,
   };
 };

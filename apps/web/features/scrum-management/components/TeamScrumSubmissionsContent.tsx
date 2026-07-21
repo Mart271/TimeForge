@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Search, Calendar, AlertCircle, MessageSquare, Flag, Loader2, ChevronLeft, ChevronRight, Check, Lock, LockOpen, Sparkles, X } from "lucide-react";
 import { getTeamScrums, postScrumComment, postScrumFlag, postScrumUnlock } from "../api/scrum-management.service";
 import { runAndPollAiJob } from "../api/ai-insight.service";
+import { AiFormattedText } from "@/components/shared/AiFormattedText";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { Avatar } from "@/components/shared/Avatar";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -218,9 +219,9 @@ export function TeamScrumSubmissionsContent() {
                       <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-brand">
                         <Sparkles className="h-3.5 w-3.5" /> AI Blocker Analysis — last 14 days
                       </p>
-                      <p className="whitespace-pre-wrap leading-relaxed">{blockerAnalysis.summary}</p>
+                      <AiFormattedText text={blockerAnalysis.summary} className="leading-relaxed" />
                       {blockerAnalysis.recommendation ? (
-                        <p className="whitespace-pre-wrap leading-relaxed text-brand-muted">{blockerAnalysis.recommendation}</p>
+                        <AiFormattedText text={blockerAnalysis.recommendation} className="leading-relaxed text-brand-muted" />
                       ) : null}
                     </div>
                     <button

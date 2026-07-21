@@ -21,6 +21,7 @@ import {
 import { ApiError } from "@/lib/api/client";
 import { listDepartments } from "@/features/schedules/api/departments-picker.service";
 import { runAndPollAiJob } from "@/features/scrum-management/api/ai-insight.service";
+import { AiFormattedText } from "@/components/shared/AiFormattedText";
 
 const METRIC_TYPES: KpiMetricType[] = ["COUNT", "HOURS", "PERCENT", "CURRENCY", "CUSTOM"];
 const PERIODS: KpiPeriod[] = ["DAILY", "WEEKLY", "MONTHLY", "PAYROLL_PERIOD"];
@@ -276,11 +277,11 @@ export function KpiManagementContent() {
             <div className="p-6 space-y-4 text-sm text-brand-ink">
               <div>
                 <p className="mb-1 text-xs font-bold uppercase tracking-wide text-brand-muted">Summary</p>
-                <p className="whitespace-pre-wrap rounded-lg border border-[#c3c6d2]/40 bg-[#f6f3f4]/40 p-3 leading-relaxed">{analysis.summary}</p>
+                <AiFormattedText text={analysis.summary} className="rounded-lg border border-[#c3c6d2]/40 bg-[#f6f3f4]/40 p-3 leading-relaxed" />
               </div>
               <div>
                 <p className="mb-1 text-xs font-bold uppercase tracking-wide text-brand-muted">Recommendation</p>
-                <p className="whitespace-pre-wrap rounded-lg border border-brand/20 bg-brand-cyan/5 p-3 leading-relaxed">{analysis.recommendation}</p>
+                <AiFormattedText text={analysis.recommendation} className="rounded-lg border border-brand/20 bg-brand-cyan/5 p-3 leading-relaxed" />
               </div>
             </div>
             <div className="flex justify-end border-t border-[#c3c6d2]/40 px-6 py-4">

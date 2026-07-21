@@ -37,6 +37,7 @@ import {
   type PayrollPeriodType,
 } from "../api/payroll-processing.service";
 import { runAndPollAiJob } from "@/features/scrum-management/api/ai-insight.service";
+import { AiFormattedText } from "@/components/shared/AiFormattedText";
 
 const WIZARD_STEPS = [
   { n: 1, key: "period", label: "Period" },
@@ -549,8 +550,8 @@ export function PayrollProcessingContent() {
                   <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-brand">
                     <Sparkles className="h-3.5 w-3.5" /> AI Payroll Check
                   </p>
-                  <p className="whitespace-pre-wrap leading-relaxed">{aiCheck.summary}</p>
-                  <p className="whitespace-pre-wrap leading-relaxed text-brand-muted">{aiCheck.recommendation}</p>
+                  <AiFormattedText text={aiCheck.summary} className="leading-relaxed" />
+                  <AiFormattedText text={aiCheck.recommendation} className="leading-relaxed text-brand-muted" />
                 </div>
                 <button
                   type="button"
