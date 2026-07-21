@@ -9,6 +9,7 @@ import { AuditAction, Prisma, Timesheet, TimesheetStatus } from '@prisma/client'
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { buildPage, decodeCursor, PageResult } from '../../common/crud/crud.service';
 import { AuthPrincipal } from '../../common/decorators';
+import { registerPdfFonts, PDF_FONT, PDF_FONT_BOLD } from '../../common/pdf/pdf-fonts';
 import { DepartmentScopeService } from '../../common/scoping/department-scope.service';
 import { PERMISSIONS } from '@timeforge/shared';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -943,6 +944,7 @@ export class TimesheetsService {
 
     const { default: PDFDocument } = await import('pdfkit');
     const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
+    registerPdfFonts(doc);
     const chunks: Buffer[] = [];
     doc.on('data', (c: Buffer) => chunks.push(c));
     doc.fontSize(18).text('HR Timesheet Report', { align: 'center' });
@@ -952,8 +954,8 @@ export class TimesheetsService {
     const colW = [140, 100, 80, 60, 90, 110, 200];
     const drawRow = (vals: string[], isHeader: boolean) => {
       let x = 30;
-      if (isHeader) doc.fontSize(8).font('Helvetica-Bold');
-      else doc.fontSize(7).font('Helvetica');
+      if (isHeader) doc.fontSize(8).font(PDF_FONT_BOLD);
+      else doc.fontSize(7).font(PDF_FONT);
       const rowY = doc.y;
       vals.forEach((v, i) => { doc.text(v, x, rowY, { width: colW[i], lineBreak: false }); x += colW[i]; });
       doc.y = rowY;
@@ -988,36 +990,37 @@ export class TimesheetsService {
 
     const { default: PDFDocument } = await import('pdfkit');
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    registerPdfFonts(doc);
     const chunks: Buffer[] = [];
     doc.on('data', (c: Buffer) => chunks.push(c));
 
-    doc.fontSize(20).font('Helvetica-Bold').text('TimeForge Timesheet Report', { align: 'center' });
+    doc.fontSize(20).font(PDF_FONT_BOLD).text('TimeForge Timesheet Report', { align: 'center' });
     doc.moveDown(1);
 
-    doc.fontSize(10).font('Helvetica-Bold').text('Employee Details:');
-    doc.font('Helvetica')
+    doc.fontSize(10).font(PDF_FONT_BOLD).text('Employee Details:');
+    doc.font(PDF_FONT)
       .text(`Name: ${sheet.user.firstName} ${sheet.user.lastName}`)
       .text(`Email: ${sheet.user.email}`)
       .text(`Department: ${sheet.user.department?.name ?? 'No Department'}`);
     
     doc.moveDown(0.5);
-    doc.font('Helvetica-Bold').text('Timesheet Details:');
-    doc.font('Helvetica')
+    doc.font(PDF_FONT_BOLD).text('Timesheet Details:');
+    doc.font(PDF_FONT)
       .text(`Period: ${sheet.periodStart.toISOString().slice(0, 10)} to ${sheet.periodEnd.toISOString().slice(0, 10)}`)
       .text(`Status: ${sheet.status}`)
       .text(`Total Hours: ${(sheet.totalMinutes / 60).toFixed(2)} hrs`);
 
     if (sheet.summary) {
       doc.moveDown(0.5);
-      doc.font('Helvetica-Bold').text('Notes / Accomplishments:');
-      doc.font('Helvetica').text(sheet.summary);
+      doc.font(PDF_FONT_BOLD).text('Notes / Accomplishments:');
+      doc.font(PDF_FONT).text(sheet.summary);
     }
 
     if (sheet.approvals[0]) {
       const app = sheet.approvals[0];
       doc.moveDown(0.5);
-      doc.font('Helvetica-Bold').text('Approval History:');
-      doc.font('Helvetica')
+      doc.font(PDF_FONT_BOLD).text('Approval History:');
+      doc.font(PDF_FONT)
         .text(`Supervisor: ${app.supervisor.firstName} ${app.supervisor.lastName}`)
         .text(`Decision: ${app.lastAction}`)
         .text(`Date: ${app.actedAt.toISOString().slice(0, 10)}`)
@@ -1025,13 +1028,13 @@ export class TimesheetsService {
     }
 
     doc.moveDown(1.5);
-    doc.fontSize(12).font('Helvetica-Bold').text('Time Entries Log', { underline: true });
+    doc.fontSize(12).font(PDF_FONT_BOLD).text('Time Entries Log', { underline: true });
     doc.moveDown(0.5);
 
     const cols = ['Date', 'Project', 'Activity', 'Clock In', 'Clock Out', 'Duration'];
     const colW = [70, 90, 120, 90, 90, 60];
     let x = 40;
-    doc.fontSize(9).font('Helvetica-Bold');
+    doc.fontSize(9).font(PDF_FONT_BOLD);
     const headerY = doc.y;
     cols.forEach((c, i) => {
       doc.text(c, x, headerY, { width: colW[i], lineBreak: false });
@@ -1039,7 +1042,7 @@ export class TimesheetsService {
     });
     doc.y = headerY;
     doc.moveDown(1);
-    doc.font('Helvetica');
+    doc.font(PDF_FONT);
 
     const currentY = doc.y;
     doc.moveTo(40, currentY).lineTo(doc.page.width - 40, currentY).stroke();
@@ -1071,7 +1074,7 @@ export class TimesheetsService {
       if (doc.y > doc.page.height - 60) {
         doc.addPage();
         x = 40;
-        doc.fontSize(9).font('Helvetica-Bold');
+        doc.fontSize(9).font(PDF_FONT_BOLD);
         const pageHeaderY = doc.y;
         cols.forEach((c, i) => {
           doc.text(c, x, pageHeaderY, { width: colW[i], lineBreak: false });
@@ -1079,7 +1082,7 @@ export class TimesheetsService {
         });
         doc.y = pageHeaderY;
         doc.moveDown(1);
-        doc.font('Helvetica');
+        doc.font(PDF_FONT);
         doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke();
         doc.moveDown(0.4);
       }

@@ -2,6 +2,7 @@ import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/commo
 import { Prisma, ReportCategory, ReportStatus, AuditAction, TimesheetStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuthPrincipal } from '../../common/decorators';
+import { registerPdfFonts, PDF_FONT, PDF_FONT_BOLD } from '../../common/pdf/pdf-fonts';
 import { DepartmentScopeService } from '../../common/scoping/department-scope.service';
 import { CacheService } from '../../infra/cache.service';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -461,6 +462,7 @@ export class ReportsService {
     if (format === 'PDF') {
       const { default: PDFDocument } = await import('pdfkit');
       const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
+      registerPdfFonts(doc);
       const chunks: Buffer[] = [];
       doc.on('data', (c: Buffer) => chunks.push(c));
       doc.fontSize(18).text('Attendance Report', { align: 'center' });
@@ -470,7 +472,7 @@ export class ReportsService {
       const colW = [140, 130, 70, 70, 70, 60, 80, 90];
       const drawRow = (vals: string[], isHeader: boolean) => {
         let x = 40;
-        doc.font(isHeader ? 'Helvetica-Bold' : 'Helvetica').fontSize(isHeader ? 9 : 8);
+        doc.font(isHeader ? PDF_FONT_BOLD : PDF_FONT).fontSize(isHeader ? 9 : 8);
         const rowY = doc.y;
         vals.forEach((v, i) => {
           doc.text(v, x, rowY, { width: colW[i], lineBreak: false });

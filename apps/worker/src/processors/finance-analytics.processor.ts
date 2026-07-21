@@ -6,6 +6,7 @@ import PDFDocument from 'pdfkit';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../api/src/common/prisma/prisma.service';
 import { StorageService } from '../../../api/src/modules/storage/storage.service';
+import { registerPdfFonts } from '../../../api/src/common/pdf/pdf-fonts';
 
 export interface FinanceAnalyticsJobData {
   tenantId: string;
@@ -62,6 +63,7 @@ export class FinanceAnalyticsProcessor extends WorkerHost {
       });
     } else {
       const doc = new PDFDocument({ margin: 50 });
+      registerPdfFonts(doc);
       const chunks: Buffer[] = [];
       doc.on('data', (c) => chunks.push(c));
       doc.fontSize(18).text('Finance Dashboard Report', { align: 'center' });

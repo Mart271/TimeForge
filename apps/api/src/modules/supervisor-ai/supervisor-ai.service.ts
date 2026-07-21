@@ -8,6 +8,7 @@ import { Queue } from 'bullmq';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CacheService } from '../../infra/cache.service';
 import { AuthPrincipal } from '../../common/decorators';
+import { registerPdfFonts, PDF_FONT, PDF_FONT_BOLD } from '../../common/pdf/pdf-fonts';
 import { DepartmentScopeService } from '../../common/scoping/department-scope.service';
 import { PERMISSIONS } from '@timeforge/shared';
 import { SupervisorAiExportDto, SupervisorAiQuery } from './dto';
@@ -970,6 +971,7 @@ export class SupervisorAiService {
     } else {
       const { default: PDFDocument } = await import('pdfkit');
       const doc = new PDFDocument({ margin: 50 });
+      registerPdfFonts(doc);
       const chunks: Buffer[] = [];
       doc.on('data', (chunk) => chunks.push(chunk));
 
@@ -982,25 +984,25 @@ export class SupervisorAiService {
        *  so a heading never gets stranded alone at the bottom of a page. */
       const sectionHeader = (title: string) => {
         if (doc.y > BOTTOM - 70) doc.addPage();
-        doc.fontSize(14).font('Helvetica-Bold').fillColor('#0f172a').text(title, LEFT);
+        doc.fontSize(14).font(PDF_FONT_BOLD).fillColor('#0f172a').text(title, LEFT);
         const ruleY = doc.y + 2;
         doc.moveTo(LEFT, ruleY).lineTo(RIGHT, ruleY).strokeColor('#c3c6d2').lineWidth(1).stroke();
         doc.moveDown(0.7);
-        doc.fillColor('black').fontSize(10).font('Helvetica');
+        doc.fillColor('black').fontSize(10).font(PDF_FONT);
       };
 
       /** Keeps a title+body block together — moves to a new page first if the
        *  block would otherwise straddle a page break mid-item. */
       const entry = (title: string, lines: string[], estLines = lines.length + 1) => {
         if (doc.y > BOTTOM - estLines * 14) doc.addPage();
-        doc.font('Helvetica-Bold').text(title, LEFT, doc.y, { width: RIGHT - LEFT });
-        doc.font('Helvetica');
+        doc.font(PDF_FONT_BOLD).text(title, LEFT, doc.y, { width: RIGHT - LEFT });
+        doc.font(PDF_FONT);
         for (const line of lines) doc.text(line, LEFT + 12, doc.y, { width: RIGHT - LEFT - 12 });
         doc.moveDown(0.6);
       };
 
-      doc.fontSize(20).font('Helvetica-Bold').text('AI Insights Report', { align: 'center' });
-      doc.fontSize(10).font('Helvetica').text(`Generated ${new Date().toLocaleString()}`, { align: 'center' });
+      doc.fontSize(20).font(PDF_FONT_BOLD).text('AI Insights Report', { align: 'center' });
+      doc.fontSize(10).font(PDF_FONT).text(`Generated ${new Date().toLocaleString()}`, { align: 'center' });
       doc.moveDown(1.5);
 
       sectionHeader('Summary');

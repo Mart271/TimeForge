@@ -15,6 +15,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { buildPage, decodeCursor, PageResult } from '../../common/crud/crud.service';
 import { IDEMPOTENCY_TTL_MS } from '../../common/constants';
 import { AuthPrincipal } from '../../common/decorators';
+import { registerPdfFonts, PDF_FONT, PDF_FONT_BOLD } from '../../common/pdf/pdf-fonts';
 import { PERMISSIONS } from '@timeforge/shared';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CacheService } from '../../infra/cache.service';
@@ -713,23 +714,24 @@ export class PayrollService {
 
     const { default: PDFDocument } = await import('pdfkit');
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    registerPdfFonts(doc);
     const chunks: Buffer[] = [];
     doc.on('data', (c: Buffer) => chunks.push(c));
 
-    doc.fontSize(20).font('Helvetica-Bold').text('TimeForge Payslip', { align: 'center' });
+    doc.fontSize(20).font(PDF_FONT_BOLD).text('TimeForge Payslip', { align: 'center' });
     doc.moveDown(1.5);
 
     const startY = doc.y;
-    doc.fontSize(10).font('Helvetica-Bold').text('EMPLOYEE DETAILS:', 40, startY);
-    doc.font('Helvetica')
+    doc.fontSize(10).font(PDF_FONT_BOLD).text('EMPLOYEE DETAILS:', 40, startY);
+    doc.font(PDF_FONT)
       .text(`Name: ${item.user.firstName} ${item.user.lastName}`)
       .text(`Job Title: ${item.user.jobTitle ?? 'Employee'}`)
       .text(`Department: ${item.user.department?.name ?? 'No Department'}`)
       .text(`Email: ${item.user.email}`);
 
     const rightX = 300;
-    doc.font('Helvetica-Bold').text('PAYSLIP DETAILS:', rightX, startY);
-    doc.font('Helvetica')
+    doc.font(PDF_FONT_BOLD).text('PAYSLIP DETAILS:', rightX, startY);
+    doc.font(PDF_FONT)
       .text(`Pay Period: ${item.payrollReport.period.startDate.toISOString().slice(0, 10)} to ${item.payrollReport.period.endDate.toISOString().slice(0, 10)}`, rightX)
       .text(`Status: ${item.payrollReport.period.status}`, rightX)
       .text(`Issued On: ${item.createdAt.toISOString().slice(0, 10)}`, rightX);
@@ -740,13 +742,13 @@ export class PayrollService {
     doc.moveTo(40, currentY).lineTo(doc.page.width - 40, currentY).stroke();
     doc.moveDown(1);
 
-    doc.fontSize(12).font('Helvetica-Bold').text('Earnings Breakdown');
+    doc.fontSize(12).font(PDF_FONT_BOLD).text('Earnings Breakdown');
     doc.moveDown(0.5);
 
     const cols = ['Description', 'Hours / Rate', 'Amount'];
     const colW = [250, 150, 120];
     let x = 40;
-    doc.fontSize(10).font('Helvetica-Bold');
+    doc.fontSize(10).font(PDF_FONT_BOLD);
     const earningsHeaderY = doc.y;
     cols.forEach((c, i) => {
       doc.text(c, x, earningsHeaderY, { width: colW[i], lineBreak: false });
@@ -754,7 +756,7 @@ export class PayrollService {
     });
     doc.y = earningsHeaderY;
     doc.moveDown(1);
-    doc.font('Helvetica');
+    doc.font(PDF_FONT);
 
     const tableLineY = doc.y;
     doc.moveTo(40, tableLineY).lineTo(doc.page.width - 40, tableLineY).stroke();
@@ -781,7 +783,7 @@ export class PayrollService {
     doc.moveTo(40, totalLineY).lineTo(doc.page.width - 40, totalLineY).stroke();
     doc.moveDown(0.5);
 
-    doc.fontSize(11).font('Helvetica-Bold');
+    doc.fontSize(11).font(PDF_FONT_BOLD);
     const grossY = doc.y;
     doc.text('Gross Earnings', 40, grossY, { width: colW[0] });
     doc.text(`₱${gross.toFixed(2)}`, 40 + colW[0] + colW[1], grossY, { width: colW[2] });

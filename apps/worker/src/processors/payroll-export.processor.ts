@@ -5,6 +5,7 @@ import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 import { PrismaService } from '../../../api/src/common/prisma/prisma.service';
 import { StorageService } from '../../../api/src/modules/storage/storage.service';
+import { registerPdfFonts } from '../../../api/src/common/pdf/pdf-fonts';
 import { NotificationsService } from '../../../api/src/modules/notifications/notifications.service';
 import type { PayrollExportJobData } from '../../../api/src/modules/payroll/payroll.service';
 
@@ -155,6 +156,7 @@ function totalsOf(row: PeriodSummaryRow): { headcount: number; totalEstimatedPay
 async function buildPeriodPdf(startDate: Date, endDate: Date, lineItems: LineItemRow[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 40 });
+    registerPdfFonts(doc);
     const chunks: Buffer[] = [];
     doc.on('data', (c: Buffer) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -211,6 +213,7 @@ function buildOrgCsv(periods: PeriodSummaryRow[]): string {
 async function buildOrgPdf(periods: PeriodSummaryRow[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 40 });
+    registerPdfFonts(doc);
     const chunks: Buffer[] = [];
     doc.on('data', (c: Buffer) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));

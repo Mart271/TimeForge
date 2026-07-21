@@ -5,6 +5,7 @@ import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 import { PrismaService } from '../../../api/src/common/prisma/prisma.service';
 import { StorageService } from '../../../api/src/modules/storage/storage.service';
+import { registerPdfFonts } from '../../../api/src/common/pdf/pdf-fonts';
 import { NotificationsService } from '../../../api/src/modules/notifications/notifications.service';
 import type { OrganizationExportJobData } from '../../../api/src/modules/organization/organization.service';
 
@@ -156,6 +157,7 @@ async function buildExcel(departments: DeptRow[], projects: ProjectRow[]): Promi
 async function buildPdf(departments: DeptRow[], projects: ProjectRow[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 40 });
+    registerPdfFonts(doc);
     const chunks: Buffer[] = [];
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));

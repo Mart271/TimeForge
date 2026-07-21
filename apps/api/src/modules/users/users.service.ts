@@ -10,6 +10,7 @@ import { AuditAction, Prisma, UserStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuthPrincipal } from '../../common/decorators';
+import { registerPdfFonts, PDF_FONT, PDF_FONT_BOLD } from '../../common/pdf/pdf-fonts';
 import { DepartmentScopeService } from '../../common/scoping/department-scope.service';
 import { buildPage, decodeCursor } from '../../common/crud/crud.service';
 import {
@@ -464,6 +465,7 @@ export class UsersService {
     // Mirrors the pdfkit pattern used by timesheets.hrExportPdf.
     const { default: PDFDocument } = await import('pdfkit');
     const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
+    registerPdfFonts(doc);
     const chunks: Buffer[] = [];
     doc.on('data', (c: Buffer) => chunks.push(c));
     doc.fontSize(18).text('Employee Directory', { align: 'center' });
@@ -473,8 +475,8 @@ export class UsersService {
     const colW = [150, 200, 110, 120, 100, 90];
     const drawRow = (vals: string[], isHeader: boolean) => {
       let x = 30;
-      if (isHeader) doc.fontSize(9).font('Helvetica-Bold');
-      else doc.fontSize(8).font('Helvetica');
+      if (isHeader) doc.fontSize(9).font(PDF_FONT_BOLD);
+      else doc.fontSize(8).font(PDF_FONT);
       const rowY = doc.y;
       vals.forEach((v, i) => {
         doc.text(v, x, rowY, { width: colW[i], lineBreak: false });
