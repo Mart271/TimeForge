@@ -13,6 +13,7 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { useAuth } from "@/providers/auth-provider";
+import { getMe } from "@/features/account/api/account.service";
 import { getCalendar } from "../api/schedules.service";
 import { listDepartments } from "../api/departments-picker.service";
 import { ScheduleSummaryCards } from "./ScheduleSummaryCards";
@@ -47,12 +48,17 @@ export function SchedulesContent() {
 
   const { data: allDepartments } = useQuery({ queryKey: ["departments", "picker"], queryFn: listDepartments });
   const isSupervisorOnly = canManage && user?.roles.some((r) => r === "SUPERVISOR") && !user?.roles.some((r) => ["HR", "ADMIN"].includes(r));
-  const departments = isSupervisorOnly ? (allDepartments ?? []).filter((d) => d.manager?.id === user?.id) : (allDepartments ?? []);
+  // A supervisor may (via department config) head more than one department, but
+  // "Team Schedules" should only ever show the department they themselves belong
+  // to — not every department they happen to manage. Me.department is that scope.
+  const { data: me } = useQuery({ queryKey: ["account", "me"], queryFn: getMe, enabled: isSupervisorOnly });
+  const departments = isSupervisorOnly
+    ? (allDepartments ?? []).filter((d) => d.id === me?.department?.id)
+    : (allDepartments ?? []);
   const managedDeptIds = isSupervisorOnly ? departments.map((d) => d.id) : undefined;
 
-  // Supervisors are scoped to the department(s) they head — no "All Departments"
-  // rollup across other teams they don't manage. Default to their own department
-  // once it loads instead of the global "ALL" placeholder.
+  // Supervisors are locked to their own department — no "All Departments"
+  // rollup and no picking a different department they might also manage.
   useEffect(() => {
     if (isSupervisorOnly && departmentId === "ALL" && departments.length > 0) {
       setDepartmentId(departments[0].id);
@@ -141,24 +147,9 @@ export function SchedulesContent() {
 
           <div className="ml-auto">
             {isSupervisorOnly ? (
-              departments.length > 1 ? (
-                <Select value={departmentId} onValueChange={(v) => setDepartmentId(v ?? departments[0]?.id ?? "ALL")}>
-                  <SelectTrigger aria-label="Filter by department" className="h-9 w-48 rounded-[8px] border-[#c3c6d2]/60 bg-white px-3 text-sm">
-                    <span className="flex flex-1 text-left truncate">
-                      {departments.find((d) => d.id === departmentId)?.name ?? departments[0]?.name}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <span className="flex h-9 w-48 items-center rounded-[8px] border border-[#c3c6d2]/60 bg-[#f6f3f4] px-3 text-sm font-bold text-brand-ink truncate">
-                  {departments[0]?.name ?? "No department"}
-                </span>
-              )
+              <span className="flex h-9 w-48 items-center rounded-[8px] border border-[#c3c6d2]/60 bg-[#f6f3f4] px-3 text-sm font-bold text-brand-ink truncate">
+                {departments[0]?.name ?? "No department"}
+              </span>
             ) : (
               <Select value={departmentId} onValueChange={(v) => setDepartmentId(v ?? "ALL")}>
                 <SelectTrigger aria-label="Filter by department" className="h-9 w-48 rounded-[8px] border-[#c3c6d2]/60 bg-white px-3 text-sm">
