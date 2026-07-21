@@ -127,12 +127,16 @@ export interface UpdateScrumEntryPayload {
 }
 
 export async function listScrumEntries(params: { from?: string; to?: string; limit?: number } = {}): Promise<Page<ScrumEntry>> {
-  const { data } = await apiClient.get<Page<ScrumEntry>>("/scrum-entries", { params });
+  const { data } = await apiClient.get<Page<ScrumEntry>>("/scrum-entries", { 
+    params: { ...params, _t: Date.now() } 
+  });
   return data;
 }
 
 export async function getScrumEntry(id: string): Promise<ScrumEntry> {
-  const { data } = await apiClient.get<ScrumEntry>(`/scrum-entries/${id}`);
+  const { data } = await apiClient.get<ScrumEntry>(`/scrum-entries/${id}`, {
+    params: { _t: Date.now() }
+  });
   return data;
 }
 
