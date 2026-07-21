@@ -290,6 +290,17 @@ export class UsersService {
     if (!role) throw new NotFoundException(`Role '${dto.role}' not found`);
 
     const { role: _roleKey, ...userData } = dto;
+
+    // Department-based supervision (Department.managerId) is the single source
+    // of truth — new hires default to their department's head unless the
+    // caller explicitly picks a different supervisor. Matches update()/approve().
+    const supervisorId =
+      userData.supervisorId !== undefined
+        ? userData.supervisorId
+        : userData.departmentId
+          ? await this.deptScope.departmentHeadId(caller.tenantId, caller.organizationId, userData.departmentId)
+          : null;
+
     const user = await this.prisma.user.create({
       data: {
         tenantId: caller.tenantId,
@@ -300,7 +311,7 @@ export class UsersService {
         employmentType: userData.employmentType,
         departmentId: userData.departmentId ?? null,
         teamId: userData.teamId ?? null,
-        supervisorId: userData.supervisorId ?? null,
+        supervisorId,
         payrollEligible: userData.payrollEligible ?? (userData.employmentType !== 'INTERN'),
         status: UserStatus.INVITED,
         createdBy: caller.userId,
