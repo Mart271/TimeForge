@@ -13,6 +13,24 @@ import { PERMISSIONS } from '@timeforge/shared';
 import { SupervisorAiExportDto, SupervisorAiQuery } from './dto';
 import { StorageService } from '../storage/storage.service';
 
+interface SupervisorAiSummaryCard {
+  value: string | number;
+  change: number;
+  trend: string;
+}
+
+interface SupervisorAiDashboardResult {
+  summaryCards: {
+    avgTeamPerformance: SupervisorAiSummaryCard;
+    aiAutomations: SupervisorAiSummaryCard;
+    activeRisks: SupervisorAiSummaryCard;
+    productivityImprovement: SupervisorAiSummaryCard;
+    teamHealthScore: SupervisorAiSummaryCard;
+  };
+  activePeriods: number;
+  lastUpdated: string;
+}
+
 @Injectable()
 export class SupervisorAiService {
   private readonly logger = new Logger(SupervisorAiService.name);
@@ -76,10 +94,10 @@ export class SupervisorAiService {
 
   // ─────── GET /supervisor/ai/dashboard ───────
 
-  async getDashboard(p: AuthPrincipal, query: SupervisorAiQuery) {
+  async getDashboard(p: AuthPrincipal, query: SupervisorAiQuery): Promise<SupervisorAiDashboardResult> {
     this.assertAccess(p);
     const cacheKey = `supervisor-ai:dashboard:${p.userId}`;
-    const cached = await this.cache.get<unknown>(cacheKey);
+    const cached = await this.cache.get<SupervisorAiDashboardResult>(cacheKey);
     if (cached) return cached;
 
     const members = await this.teamMembers(p, query);
@@ -852,78 +870,99 @@ export class SupervisorAiService {
 
   // ─────── POST /supervisor/ai/export ───────
 
+  /**
+   * Exports the actual content of the AI Insights page (dashboard summary,
+   * coach insights, recommendations, team health, trends, alerts) — not a
+   * generic KPI audit. Previously this reused the unrelated Performance
+   * Insights export logic verbatim, so clicking "Export Report" here produced
+   * an "Employee Performance Audit Report" with none of the AI analysis the
+   * page actually shows.
+   */
   async queueExport(p: AuthPrincipal, dto: SupervisorAiExportDto) {
     this.assertAccess(p);
-    const userIds = await this.scopeUserIds(p);
-    const members = await this.prisma.user.findMany({
-      where: {
-        tenantId: p.tenantId,
-        organizationId: p.organizationId,
-        deletedAt: null,
-        ...(userIds ? { id: { in: userIds } } : {}),
-        ...(dto.teamId ? { teamId: dto.teamId } : {}),
-        ...(dto.departmentId ? { departmentId: dto.departmentId } : {}),
-      },
-      select: { id: true, firstName: true, lastName: true },
-    });
+    const query: SupervisorAiQuery = { teamId: dto.teamId, departmentId: dto.departmentId, from: dto.from, to: dto.to };
 
-    const key = `exports/performance_${p.userId}_${Date.now()}.${dto.format.toLowerCase()}`;
-    const users = await this.prisma.user.findMany({
-      where: { id: { in: members.map((m) => m.id) }, deletedAt: null },
-      include: {
-        securityLogs: { take: 5 },
-        kpiProgress: { include: { kpiTemplate: true } },
-      },
-    });
+    const [dashboard, insights, recommendations, teamHealth, trends, alerts] = await Promise.all([
+      this.getDashboard(p, query),
+      this.getInsights(p, query),
+      this.getRecommendations(p, query),
+      this.getTeamHealth(p, query),
+      this.getTrends(p, query),
+      this.getAlerts(p, query),
+    ]);
+
+    const key = `exports/ai-insights_${p.userId}_${Date.now()}.${dto.format.toLowerCase()}`;
 
     if (dto.format === 'CSV') {
-      const csvLines = ['User ID,Name,Email,KPI Module,Current Value,Target Value,Score'];
-      users.forEach((u) => {
-        u.kpiProgress.forEach((k) => {
-          const score = Number(k.targetValue) > 0 ? Math.min(100, Math.round((Number(k.currentValue) / Number(k.targetValue)) * 100)) : 0;
-          csvLines.push(
-            [
-              u.id,
-              `"${u.firstName} ${u.lastName}"`,
-              u.email,
-              `"${k.kpiTemplate.name}"`,
-              k.currentValue,
-              k.targetValue,
-              score,
-            ].join(','),
-          );
-        });
-      });
+      const csvLines: string[] = ['Section,Field,Value'];
+      const push = (section: string, field: string, value: unknown) =>
+        csvLines.push(`"${section}","${field}","${String(value).replace(/"/g, '""')}"`);
+
+      push('Summary', 'Avg Team Performance', dashboard.summaryCards.avgTeamPerformance.value);
+      push('Summary', 'AI Automations', dashboard.summaryCards.aiAutomations.value);
+      push('Summary', 'Active Risks', dashboard.summaryCards.activeRisks.value);
+      push('Summary', 'Productivity Improvement', dashboard.summaryCards.productivityImprovement.value);
+      push('Summary', 'Team Health Score', dashboard.summaryCards.teamHealthScore.value);
+
+      insights.insights.forEach((i, idx) => push('Coach Insight', `#${idx + 1} ${i.title}`, i.description));
+      recommendations.recommendations.forEach((r, idx) =>
+        push('Recommendation', `#${idx + 1} ${r.title}${r.employeeName ? ` (${r.employeeName})` : ''}`, r.description),
+      );
+      push('Team Health', 'Overall Score', `${teamHealth.overallHealthScore}% (${teamHealth.riskLevel} risk)`);
+      teamHealth.scores.forEach((s) => push('Team Health', s.label, `${s.value}/${s.target}`));
+      push('Trends', 'Total Hours', trends.summary.totalHours);
+      push('Trends', 'Total Tasks', trends.summary.totalTasks);
+      push('Trends', 'Avg Focus Time', trends.summary.avgFocusTime);
+      push('Trends', 'Team Velocity', trends.summary.teamVelocity);
+      alerts.alerts.forEach((a, idx) => push('Alert', `#${idx + 1} ${a.title} (${a.severity})`, a.message));
+
       const buffer = Buffer.from(csvLines.join('\n'), 'utf-8');
       await this.storage.put(key, buffer, { contentType: 'text/csv' });
     } else if (dto.format === 'XLSX') {
       const ExcelJS = await import('exceljs');
       const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet('Performance');
-      sheet.columns = [
-        { header: 'User ID', key: 'id', width: 36 },
-        { header: 'Name', key: 'name', width: 25 },
-        { header: 'Email', key: 'email', width: 25 },
-        { header: 'KPI Module', key: 'kpi', width: 30 },
-        { header: 'Current Value', key: 'current', width: 15 },
-        { header: 'Target Value', key: 'target', width: 15 },
-        { header: 'Score %', key: 'score', width: 10 },
-      ];
 
-      users.forEach((u) => {
-        u.kpiProgress.forEach((k) => {
-          const score = Number(k.targetValue) > 0 ? Math.min(100, Math.round((Number(k.currentValue) / Number(k.targetValue)) * 100)) : 0;
-          sheet.addRow({
-            id: u.id,
-            name: `${u.firstName} ${u.lastName}`,
-            email: u.email,
-            kpi: k.kpiTemplate.name,
-            current: Number(k.currentValue),
-            target: Number(k.targetValue),
-            score,
-          });
-        });
-      });
+      const summarySheet = workbook.addWorksheet('Summary');
+      summarySheet.columns = [{ header: 'Metric', key: 'metric', width: 30 }, { header: 'Value', key: 'value', width: 20 }];
+      summarySheet.addRows([
+        { metric: 'Avg Team Performance', value: dashboard.summaryCards.avgTeamPerformance.value },
+        { metric: 'AI Automations', value: dashboard.summaryCards.aiAutomations.value },
+        { metric: 'Active Risks', value: dashboard.summaryCards.activeRisks.value },
+        { metric: 'Productivity Improvement', value: dashboard.summaryCards.productivityImprovement.value },
+        { metric: 'Team Health Score', value: dashboard.summaryCards.teamHealthScore.value },
+      ]);
+
+      const insightsSheet = workbook.addWorksheet('Coach Insights');
+      insightsSheet.columns = [
+        { header: 'Title', key: 'title', width: 30 },
+        { header: 'Description', key: 'description', width: 60 },
+        { header: 'Priority', key: 'priority', width: 12 },
+        { header: 'Suggested Action', key: 'action', width: 40 },
+      ];
+      insights.insights.forEach((i) => insightsSheet.addRow({ title: i.title, description: i.description, priority: i.priority, action: i.suggestedAction }));
+
+      const recSheet = workbook.addWorksheet('Recommendations');
+      recSheet.columns = [
+        { header: 'Title', key: 'title', width: 30 },
+        { header: 'Employee', key: 'employee', width: 25 },
+        { header: 'Description', key: 'description', width: 60 },
+        { header: 'Expected Impact', key: 'impact', width: 30 },
+      ];
+      recommendations.recommendations.forEach((r) => recSheet.addRow({ title: r.title, employee: r.employeeName ?? '', description: r.description, impact: r.expectedImpact }));
+
+      const healthSheet = workbook.addWorksheet('Team Health');
+      healthSheet.columns = [{ header: 'Metric', key: 'label', width: 25 }, { header: 'Value', key: 'value', width: 12 }, { header: 'Target', key: 'target', width: 12 }];
+      healthSheet.addRow({ label: 'Overall Health Score', value: teamHealth.overallHealthScore, target: '' });
+      teamHealth.scores.forEach((s) => healthSheet.addRow({ label: s.label, value: s.value, target: s.target }));
+
+      const alertsSheet = workbook.addWorksheet('Alerts');
+      alertsSheet.columns = [
+        { header: 'Title', key: 'title', width: 30 },
+        { header: 'Severity', key: 'severity', width: 12 },
+        { header: 'Message', key: 'message', width: 60 },
+        { header: 'Suggested Action', key: 'action', width: 40 },
+      ];
+      alerts.alerts.forEach((a) => alertsSheet.addRow({ title: a.title, severity: a.severity, message: a.message, action: a.suggestedAction }));
 
       const excelBuffer = await workbook.xlsx.writeBuffer();
       const buffer = Buffer.from(excelBuffer as ArrayBuffer);
@@ -934,19 +973,67 @@ export class SupervisorAiService {
       const chunks: Buffer[] = [];
       doc.on('data', (chunk) => chunks.push(chunk));
 
-      doc.fontSize(20).text('Employee Performance Audit Report', { align: 'center' });
-      doc.moveDown(2);
+      doc.fontSize(20).text('AI Insights Report', { align: 'center' });
+      doc.fontSize(10).text(`Generated ${new Date().toLocaleString()}`, { align: 'center' });
+      doc.moveDown(1.5);
 
-      users.forEach((u) => {
-        doc.fontSize(14).text(`Employee: ${u.firstName} ${u.lastName} (${u.email})`, { underline: true });
+      doc.fontSize(14).font('Helvetica-Bold').text('Summary');
+      doc.moveDown(0.3);
+      doc.fontSize(10).font('Helvetica');
+      doc.text(`Avg Team Performance: ${dashboard.summaryCards.avgTeamPerformance.value}`);
+      doc.text(`AI Automations: ${dashboard.summaryCards.aiAutomations.value}`);
+      doc.text(`Active Risks: ${dashboard.summaryCards.activeRisks.value}`);
+      doc.text(`Productivity Improvement: ${dashboard.summaryCards.productivityImprovement.value}`);
+      doc.text(`Team Health Score: ${dashboard.summaryCards.teamHealthScore.value}`);
+      doc.moveDown(1);
+
+      doc.fontSize(14).font('Helvetica-Bold').text('AI Coach Insights');
+      doc.moveDown(0.3);
+      doc.fontSize(10).font('Helvetica');
+      if (insights.insights.length === 0) doc.text('No insights available.');
+      insights.insights.forEach((i) => {
+        doc.font('Helvetica-Bold').text(`${i.title} (${i.priority})`);
+        doc.font('Helvetica').text(i.description);
+        doc.text(`Suggested action: ${i.suggestedAction}`);
         doc.moveDown(0.5);
+      });
+      doc.moveDown(0.5);
 
-        u.kpiProgress.forEach((k) => {
-          const score = Number(k.targetValue) > 0 ? Math.min(100, Math.round((Number(k.currentValue) / Number(k.targetValue)) * 100)) : 0;
-          doc.fontSize(10).text(`- KPI: ${k.kpiTemplate.name} | Progress: ${k.currentValue}/${k.targetValue} (${score}%)`);
-        });
+      doc.fontSize(14).font('Helvetica-Bold').text('Recommendations');
+      doc.moveDown(0.3);
+      doc.fontSize(10).font('Helvetica');
+      if (recommendations.recommendations.length === 0) doc.text('No recommendations available.');
+      recommendations.recommendations.forEach((r) => {
+        doc.font('Helvetica-Bold').text(`${r.title}${r.employeeName ? ` — ${r.employeeName}` : ''}`);
+        doc.font('Helvetica').text(r.description);
+        doc.text(`Expected impact: ${r.expectedImpact}`);
+        doc.moveDown(0.5);
+      });
+      doc.moveDown(0.5);
 
-        doc.moveDown(1.5);
+      doc.fontSize(14).font('Helvetica-Bold').text('Team Health');
+      doc.moveDown(0.3);
+      doc.fontSize(10).font('Helvetica');
+      doc.text(`Overall Health Score: ${teamHealth.overallHealthScore}% (${teamHealth.riskLevel} risk)`);
+      doc.text(teamHealth.aiSummary);
+      teamHealth.scores.forEach((s) => doc.text(`- ${s.label}: ${s.value} (target ${s.target})`));
+      doc.moveDown(1);
+
+      doc.fontSize(14).font('Helvetica-Bold').text('Trends');
+      doc.moveDown(0.3);
+      doc.fontSize(10).font('Helvetica');
+      doc.text(`Total Hours: ${trends.summary.totalHours} | Total Tasks: ${trends.summary.totalTasks} | Avg Focus Time: ${trends.summary.avgFocusTime}% | Team Velocity: ${trends.summary.teamVelocity}`);
+      doc.moveDown(1);
+
+      doc.fontSize(14).font('Helvetica-Bold').text('Alerts');
+      doc.moveDown(0.3);
+      doc.fontSize(10).font('Helvetica');
+      if (alerts.alerts.length === 0) doc.text('No active alerts.');
+      alerts.alerts.forEach((a) => {
+        doc.font('Helvetica-Bold').text(`${a.title} (${a.severity})`);
+        doc.font('Helvetica').text(a.message);
+        doc.text(`Suggested action: ${a.suggestedAction}`);
+        doc.moveDown(0.5);
       });
 
       doc.end();
@@ -967,7 +1054,7 @@ export class SupervisorAiService {
         action: 'AI_USAGE',
         entityType: 'supervisor_ai_export',
         entityId: p.userId,
-        metadata: { format: dto.format, memberCount: members.length },
+        metadata: { format: dto.format },
       },
     });
 
