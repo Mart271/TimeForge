@@ -771,15 +771,34 @@ export class FinanceAiService {
       default: {
         const alertCount = alerts.data.length;
         const criticalAlerts = alerts.data.filter((a) => a.severity === 'HIGH').length;
+        const pendingApprovals = payrollDash?.cards.pendingHRApprovals.value ?? 0;
+        const efficiency = payrollDash?.cards.payEfficiency.value ?? 0;
+        const totalPayroll = financeDash?.totalPayroll.value ?? 0;
+
+        const clauses: string[] = [];
+        clauses.push(
+          alertCount > 0
+            ? `${alertCount} alert${alertCount === 1 ? '' : 's'} flagged across payroll and compliance checks (${criticalAlerts} critical) — review the alerts feed before the next run.`
+            : 'No active alerts — payroll and compliance checks are clean.',
+        );
+        if (pendingApprovals > 0) {
+          clauses.push(`${pendingApprovals} approval${pendingApprovals === 1 ? '' : 's'} awaiting HR sign-off.`);
+        }
+        clauses.push(
+          efficiency >= 90
+            ? `Pay efficiency is strong at ${efficiency}%.`
+            : `Pay efficiency is ${efficiency}% — below the 90% target, worth investigating processing delays.`,
+        );
+
         return {
           focusLabel: 'Finance AI Report',
           summary: {
-            totalPayroll: financeDash?.totalPayroll.value ?? 0,
+            totalPayroll,
             activeRuns: payrollDash?.cards.activePayruns.value ?? 0,
-            pendingApprovals: payrollDash?.cards.pendingHRApprovals.value ?? 0,
-            efficiency: payrollDash?.cards.payEfficiency.value ?? 0,
+            pendingApprovals,
+            efficiency,
           },
-          recommendation: `${alertCount} alerts found (${criticalAlerts} critical).`,
+          recommendation: clauses.join(' '),
           focusAlerts: alerts.data,
         };
       }
