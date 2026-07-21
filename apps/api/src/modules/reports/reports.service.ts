@@ -999,9 +999,14 @@ export class ReportsService {
 
     const laborValue = Number(currentLabor._sum.estimatedPay ?? 0);
     const prevLaborValue = Number(prevLabor._sum.estimatedPay ?? 0);
-    const laborChange = prevLaborValue > 0
+    // A previous baseline under ₱100 isn't a meaningful denominator — any
+    // real month-over-month payroll swing against it produces a nonsensical
+    // percentage (e.g. ₱7.1K vs ₱1.67 → 428,018%). Report no change instead
+    // of a misleading number; the frontend shows "New" in that case.
+    const MIN_MEANINGFUL_BASELINE = 100;
+    const laborChange = prevLaborValue >= MIN_MEANINGFUL_BASELINE
       ? Number((((laborValue - prevLaborValue) / prevLaborValue) * 100).toFixed(1))
-      : 0;
+      : null;
 
     // --- Payroll ---
     const [currentPayroll, prevPayroll] = await Promise.all([

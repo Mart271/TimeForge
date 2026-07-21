@@ -4,7 +4,8 @@ import type { ReportsQuery } from "@/features/reports/api/reports.service";
 export interface FinanceDashboardCard {
   value: number;
   previous: number;
-  change: number;
+  /** Null when the previous period's baseline is too small to make a percent change meaningful. */
+  change: number | null;
 }
 
 export interface FinanceDashboardResponse {

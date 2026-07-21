@@ -788,22 +788,28 @@ function DashboardCard({
   icon: React.FC<{ className?: string }>;
   label: string;
   value: string;
-  change: number;
+  change: number | null;
   previous: number;
 }) {
   return (
     <div className="rounded-[16px] border border-[#c3c6d2]/50 bg-white p-[21px] shadow-[0px_1px_1px_rgba(0,0,0,0.05)]">
       <div className="flex items-start justify-between">
         <Icon className="h-[26px] w-[26px] text-brand" aria-hidden="true" />
-        <span
-          className={cn(
-            "flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-bold",
-            change >= 0 ? "bg-[#f0fdf4] text-[#16a34a]" : "bg-[#fef2f2] text-[#dc2626]",
-          )}
-        >
-          {change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-          {Math.abs(change).toFixed(1)}%
-        </span>
+        {change === null ? (
+          <span className="flex items-center gap-0.5 rounded-full bg-[#f6f3f4] px-2 py-0.5 text-xs font-bold text-brand-muted">
+            New
+          </span>
+        ) : (
+          <span
+            className={cn(
+              "flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-bold",
+              change >= 0 ? "bg-[#f0fdf4] text-[#16a34a]" : "bg-[#fef2f2] text-[#dc2626]",
+            )}
+          >
+            {change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+            {Math.abs(change).toFixed(1)}%
+          </span>
+        )}
       </div>
       <p className="mt-2 text-xs text-brand-muted font-semibold">{label}</p>
       <p className="mt-1 text-2xl font-bold text-brand-ink">{value}</p>
