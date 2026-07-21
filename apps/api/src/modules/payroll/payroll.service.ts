@@ -78,6 +78,71 @@ export class PayrollService {
       .catch((err: Error) => this.logger.warn(`Idempotency persist failed: ${err.message}`));
   }
 
+  /**
+   * Line items snapshot hourlyRate/estimatedPay at generation time. When payroll
+   * was generated before a rate was configured, fall back to the employee's
+   * current rate so payslip PDFs match the employee self-view.
+   */
+  private resolvePayslipEarnings(
+    item: {
+      hourlyRate: Decimal | number | null;
+      approvedHours: Decimal | number;
+      overtimeHours: Decimal | number;
+      estimatedPay: Decimal | number | null;
+    },
+    userHourlyRate: Decimal | number | null,
+  ) {
+    const approved = Number(item.approvedHours);
+    const overtime = Number(item.overtimeHours);
+    const regular = Math.max(0, approved - overtime);
+
+    const snapshottedRate = Number(item.hourlyRate ?? 0);
+    const currentRate = Number(userHourlyRate ?? 0);
+    const rate = snapshottedRate > 0 ? snapshottedRate : currentRate;
+
+    const regPay = regular * rate;
+    const otPay = overtime * rate * 1.25;
+
+    let gross = Number(item.estimatedPay ?? 0);
+    if (gross <= 0 && rate > 0) {
+      gross = regPay + otPay;
+    }
+
+    return { rate, regular, overtime, regPay, otPay, gross };
+  }
+
+  private async recalculateOpenLineItemsForUser(
+    tenantId: string,
+    userId: string,
+    rate: number,
+    actorId: string,
+  ) {
+    const lineItems = await this.prisma.payrollLineItem.findMany({
+      where: {
+        tenantId,
+        userId,
+        payrollReport: {
+          period: { status: { in: ['OPEN', 'GENERATED'] } },
+        },
+      },
+      select: { id: true, approvedHours: true, overtimeHours: true },
+    });
+
+    await Promise.all(
+      lineItems.map((li) => {
+        const approved = Number(li.approvedHours);
+        const overtime = Number(li.overtimeHours);
+        const regular = Math.max(0, approved - overtime);
+        const estimatedPay = regular * rate + overtime * rate * 1.25;
+
+        return this.prisma.payrollLineItem.update({
+          where: { id: li.id },
+          data: { hourlyRate: rate, estimatedPay, updatedBy: actorId },
+        });
+      }),
+    );
+  }
+
   // -- Payroll Periods --
 
   async findAllPeriods(p: AuthPrincipal, query: PayrollPeriodQuery) {
@@ -631,7 +696,7 @@ export class PayrollService {
     const item = await this.prisma.payrollLineItem.findFirst({
       where: { id, tenantId: p.tenantId },
       include: {
-        user: { select: { firstName: true, lastName: true, email: true, jobTitle: true, department: { select: { name: true } } } },
+        user: { select: { firstName: true, lastName: true, email: true, jobTitle: true, hourlyRate: true, department: { select: { name: true } } } },
         payrollReport: {
           include: {
             period: true,
@@ -693,14 +758,10 @@ export class PayrollService {
     doc.moveTo(40, tableLineY).lineTo(doc.page.width - 40, tableLineY).stroke();
     doc.moveDown(0.5);
 
-    const rate = Number(item.hourlyRate);
-    const approved = Number(item.approvedHours);
-    const overtime = Number(item.overtimeHours);
-    const regular = Math.max(0, approved - overtime);
-
-    const regPay = regular * rate;
-    const otPay = overtime * rate * 1.25;
-    const gross = Number(item.estimatedPay);
+    const { rate, regular, overtime, regPay, otPay, gross } = this.resolvePayslipEarnings(
+      item,
+      item.user.hourlyRate,
+    );
 
     const drawTableRow = (desc: string, rateVal: string, amount: string) => {
       const rowY = doc.y;
@@ -820,6 +881,10 @@ export class PayrollService {
         metadata: { action: 'updateRate', previousRate: user.hourlyRate, newRate: rate },
       },
     }).catch(() => {});
+
+    await this.recalculateOpenLineItemsForUser(p.tenantId, userId, rate, p.userId).catch((err: Error) =>
+      this.logger.warn(`Failed to backfill payroll line items after rate update: ${err.message}`),
+    );
 
     return updated;
   }
