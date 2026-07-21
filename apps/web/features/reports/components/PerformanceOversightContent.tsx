@@ -35,6 +35,7 @@ import {
 } from "../api/performance.service";
 import { getMyKpiSummary } from "../api/kpi.service";
 import { useAuth } from "@/providers/auth-provider";
+import { AiRecapCard } from "./AiRecapCard";
 
 function kpiStatusColor(status: "MET" | "ON_TRACK" | "BELOW"): string {
   if (status === "MET") return "text-emerald-600";
@@ -326,6 +327,9 @@ export function PerformanceOversightContent() {
           </div>
         </div>
       </div>
+
+      {/* AI Work Recap — wires DAILY_SUMMARY / WEEKLY_SUMMARY (own data only) */}
+      {!search && user?.id ? <AiRecapCard userId={user.id} /> : null}
 
       {/* My KPIs — Target vs Actual (KPI-05, KPI-06) */}
       {!search && (

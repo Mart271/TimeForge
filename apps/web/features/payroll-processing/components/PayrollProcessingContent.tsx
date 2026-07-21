@@ -14,6 +14,8 @@ import {
   Search,
   AlertTriangle,
   Plus,
+  Sparkles,
+  X,
 } from "lucide-react";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { StatusBadge, type BadgeTone } from "@/components/shared/StatusBadge";
@@ -34,6 +36,7 @@ import {
   mostRecentlyUpdatedPeriod,
   type PayrollPeriodType,
 } from "../api/payroll-processing.service";
+import { runAndPollAiJob } from "@/features/scrum-management/api/ai-insight.service";
 
 const WIZARD_STEPS = [
   { n: 1, key: "period", label: "Period" },
@@ -152,6 +155,25 @@ export function PayrollProcessingContent() {
 
   const handleSaveDraft = () => {
     setToast({ message: "Draft saved — figures reflect the latest calculation.", tone: "success" });
+  };
+
+  // PAYROLL_VALIDATION pre-lock sanity check: locking is irreversible (a
+  // locked period can't be regenerated), so surface AI anomaly findings
+  // BEFORE Send to Finance rather than after.
+  const [aiChecking, setAiChecking] = useState(false);
+  const [aiCheck, setAiCheck] = useState<{ summary: string; recommendation: string } | null>(null);
+
+  const handleAiCheck = async () => {
+    if (!activePeriodId) return;
+    setAiChecking(true);
+    try {
+      const result = await runAndPollAiJob("PAYROLL_VALIDATION", "payroll_period", activePeriodId);
+      setAiCheck({ summary: result.summary, recommendation: result.recommendation });
+    } catch (err: any) {
+      setToast({ message: err?.message || "AI check failed.", tone: "error" });
+    } finally {
+      setAiChecking(false);
+    }
   };
 
   const lineItems = report?.lineItems ?? [];
@@ -499,6 +521,17 @@ export function PayrollProcessingContent() {
               </Button>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAiCheck}
+                disabled={!report || aiChecking}
+                title="AI anomaly scan of this period's line items — run before locking"
+                className="text-xs text-brand"
+              >
+                {aiChecking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                {aiChecking ? "Checking..." : "Run AI Check"}
+              </Button>
               <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={!report} className="text-xs">
                 <Save className="h-3.5 w-3.5" /> Save Draft
               </Button>
@@ -508,6 +541,28 @@ export function PayrollProcessingContent() {
               </Button>
             </div>
           </div>
+
+          {aiCheck ? (
+            <div className="rounded-[12px] border border-brand/25 bg-brand-cyan/5 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 space-y-2 text-sm text-brand-ink">
+                  <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-brand">
+                    <Sparkles className="h-3.5 w-3.5" /> AI Payroll Check
+                  </p>
+                  <p className="whitespace-pre-wrap leading-relaxed">{aiCheck.summary}</p>
+                  <p className="whitespace-pre-wrap leading-relaxed text-brand-muted">{aiCheck.recommendation}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiCheck(null)}
+                  className="shrink-0 text-brand-muted hover:text-brand-navy"
+                  aria-label="Dismiss AI check result"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ) : null}
         </>
       )}
     </div>

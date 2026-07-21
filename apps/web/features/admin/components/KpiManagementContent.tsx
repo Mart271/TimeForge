@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Target, Plus, Pencil, Trash2, Loader2, X } from "lucide-react";
+import { Target, Plus, Pencil, Trash2, Loader2, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { Toast, type ToastState } from "@/components/shared/Toast";
@@ -20,6 +20,7 @@ import {
 } from "../api/kpi-management.service";
 import { ApiError } from "@/lib/api/client";
 import { listDepartments } from "@/features/schedules/api/departments-picker.service";
+import { runAndPollAiJob } from "@/features/scrum-management/api/ai-insight.service";
 
 const METRIC_TYPES: KpiMetricType[] = ["COUNT", "HOURS", "PERCENT", "CURRENCY", "CUSTOM"];
 const PERIODS: KpiPeriod[] = ["DAILY", "WEEKLY", "MONTHLY", "PAYROLL_PERIOD"];
@@ -42,6 +43,22 @@ export function KpiManagementContent() {
   const [editing, setEditing] = useState<KpiTemplateRow | null>(null);
   const [form, setForm] = useState<KpiTemplatePayload>(EMPTY_FORM);
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
+  // KPI_ANALYSIS (team-wide trend analysis per template) — id of the template
+  // being analyzed, and the finished result shown in a modal.
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<{ name: string; summary: string; recommendation: string } | null>(null);
+
+  const handleAnalyze = async (tpl: KpiTemplateRow) => {
+    setAnalyzingId(tpl.id);
+    try {
+      const result = await runAndPollAiJob("KPI_ANALYSIS", "kpi_template", tpl.id);
+      setAnalysis({ name: tpl.name, summary: result.summary, recommendation: result.recommendation });
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : "AI analysis failed.", tone: "error" });
+    } finally {
+      setAnalyzingId(null);
+    }
+  };
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["admin", "kpi-templates"],
@@ -205,6 +222,20 @@ export function KpiManagementContent() {
                       <div className="flex justify-end gap-1">
                         <button
                           type="button"
+                          onClick={() => handleAnalyze(tpl)}
+                          disabled={analyzingId !== null}
+                          className="rounded-full p-1.5 text-brand-muted hover:text-brand hover:bg-[#f6f3f4] disabled:opacity-50"
+                          aria-label={`Analyze ${tpl.name} with AI`}
+                          title="AI trend analysis across everyone tracking this KPI"
+                        >
+                          {analyzingId === tpl.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-4 w-4" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => openEdit(tpl)}
                           className="rounded-full p-1.5 text-brand-muted hover:text-brand hover:bg-[#f6f3f4]"
                           aria-label={`Edit ${tpl.name}`}
@@ -229,6 +260,37 @@ export function KpiManagementContent() {
           </div>
         )}
       </SectionCard>
+
+      {analysis ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-xl max-w-lg w-full border border-[#c3c6d2] shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 pt-6">
+              <h3 className="flex items-center gap-2 text-lg font-bold text-brand-navy">
+                <Sparkles className="h-5 w-5 text-brand" />
+                AI Analysis — {analysis.name}
+              </h3>
+              <button type="button" onClick={() => setAnalysis(null)} className="text-brand-muted hover:text-brand-navy">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 text-sm text-brand-ink">
+              <div>
+                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-brand-muted">Summary</p>
+                <p className="whitespace-pre-wrap rounded-lg border border-[#c3c6d2]/40 bg-[#f6f3f4]/40 p-3 leading-relaxed">{analysis.summary}</p>
+              </div>
+              <div>
+                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-brand-muted">Recommendation</p>
+                <p className="whitespace-pre-wrap rounded-lg border border-brand/20 bg-brand-cyan/5 p-3 leading-relaxed">{analysis.recommendation}</p>
+              </div>
+            </div>
+            <div className="flex justify-end border-t border-[#c3c6d2]/40 px-6 py-4">
+              <Button variant="outline" onClick={() => setAnalysis(null)} className="text-xs">
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {modalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">

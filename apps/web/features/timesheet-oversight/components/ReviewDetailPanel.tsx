@@ -2,12 +2,13 @@
 
 import { useState, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Clock, TrendingUp, BookOpen, MessageSquare, Loader2, RefreshCw, AlertCircle, Ban, ChevronDown, ChevronUp, Link2, Paperclip, Download } from "lucide-react";
+import { Clock, TrendingUp, BookOpen, MessageSquare, Loader2, RefreshCw, AlertCircle, Ban, ChevronDown, ChevronUp, Link2, Paperclip, Download, Sparkles } from "lucide-react";
 import { StatusBadge, timesheetStatusTone } from "@/components/shared/StatusBadge";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api/client";
 import { approveTimesheet, rejectTimesheet, requestRevisionTimesheet, type TimesheetDetail } from "../api/timesheet-oversight.service";
 import { getAttachmentSignedUrl } from "../../time-tracking/api/time-entries.service";
+import { runAndPollAiJob } from "@/features/scrum-management/api/ai-insight.service";
 
 interface ReviewDetailPanelProps {
   detail: TimesheetDetail | null;
@@ -28,6 +29,56 @@ export function ReviewDetailPanel({ detail, loading, onSuccess, onToast }: Revie
   const queryClient = useQueryClient();
   const [remark, setRemark] = useState("");
   const [expandedEntries, setExpandedEntries] = useState<Record<string, boolean>>({});
+  const [suggestingRemark, setSuggestingRemark] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
+  const [aiSummary, setAiSummary] = useState<{ summary: string; recommendation: string } | null>(null);
+
+  // TIMESHEET_SUMMARY — natural-language recap of this timesheet's entries.
+  const handleAiSummary = async () => {
+    if (!detail) return;
+    setSummarizing(true);
+    try {
+      const result = await runAndPollAiJob("TIMESHEET_SUMMARY", "timesheet", detail.id);
+      setAiSummary({ summary: result.summary, recommendation: result.recommendation });
+    } catch (err) {
+      onToast({ message: err instanceof Error ? err.message : "AI summary failed.", tone: "error" });
+    } finally {
+      setSummarizing(false);
+    }
+  };
+
+  // Drafts a decision remark from this timesheet's review context (hours,
+  // overtime, tasks) via the IMPROVE_DESCRIPTION approval-remark mode. The
+  // draft only fills the textarea — the supervisor edits and decides.
+  const handleSuggestRemark = async () => {
+    if (!detail) return;
+    setSuggestingRemark(true);
+    try {
+      const totalMinutes = detail.entries.reduce((acc, e) => acc + (e.durationMinutes ?? 0), 0);
+      const taskLines = detail.entries
+        .slice(0, 15)
+        .map((e) => `- ${e.task || e.description || "General work"}${e.project?.name ? ` (${e.project.name})` : ""}`)
+        .join("\n");
+      const context =
+        `Employee: ${detail.user.firstName} ${detail.user.lastName}\n` +
+        `Period: ${detail.periodStart.slice(0, 10)} to ${detail.periodEnd.slice(0, 10)}\n` +
+        `Total hours: ${(totalMinutes / 60).toFixed(1)}\n` +
+        (detail.summary ? `Employee notes: ${detail.summary}\n` : "") +
+        `Tasks:\n${taskLines || "- (no entries)"}`;
+      const result = await runAndPollAiJob("IMPROVE_DESCRIPTION", "timesheet", detail.id, {
+        text: context,
+        mode: "approval-remark",
+      });
+      if (result?.recommendation) {
+        setRemark(result.recommendation);
+        onToast({ message: "Draft remark inserted — edit before deciding.", tone: "success" });
+      }
+    } catch (err) {
+      onToast({ message: err instanceof Error ? err.message : "Could not draft a remark.", tone: "error" });
+    } finally {
+      setSuggestingRemark(false);
+    }
+  };
 
   const toggleExpand = (id: string) => {
     setExpandedEntries((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -130,8 +181,44 @@ export function ReviewDetailPanel({ detail, loading, onSuccess, onToast }: Revie
           <h2 className="text-xl font-bold text-brand-navy">{name}</h2>
           <p className="text-xs text-brand-muted">{detail.user.department?.name ?? "No Department"}</p>
         </div>
-        <StatusBadge label={label} tone={tone} />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleAiSummary}
+            disabled={summarizing}
+            title="AI summary of this timesheet's entries for faster review"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#c3c6d2] bg-gradient-to-r from-brand/5 to-brand-cyan/5 px-2.5 py-1 text-xs font-semibold text-brand shadow-sm transition-all hover:border-brand hover:from-brand/10 hover:to-brand-cyan/10 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {summarizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {summarizing ? "Summarizing..." : "AI Summary"}
+          </button>
+          <StatusBadge label={label} tone={tone} />
+        </div>
       </div>
+
+      {aiSummary ? (
+        <div className="rounded-[12px] border border-brand/25 bg-brand-cyan/5 p-4 text-sm text-brand-ink">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 space-y-2">
+              <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-brand">
+                <Sparkles className="h-3.5 w-3.5" /> AI Timesheet Summary
+              </p>
+              <p className="whitespace-pre-wrap leading-relaxed">{aiSummary.summary}</p>
+              {aiSummary.recommendation ? (
+                <p className="whitespace-pre-wrap leading-relaxed text-brand-muted">{aiSummary.recommendation}</p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={() => setAiSummary(null)}
+              className="shrink-0 text-brand-muted hover:text-brand-navy"
+              aria-label="Dismiss AI summary"
+            >
+              <Ban className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Grid panels */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -383,10 +470,22 @@ export function ReviewDetailPanel({ detail, loading, onSuccess, onToast }: Revie
 
       {/* Coaching & remarks */}
       <div className="flex flex-col gap-1.5 border-t border-[#c3c6d2]/25 pt-4">
-        <label htmlFor="approvals-remark" className="text-xs font-bold uppercase tracking-wider text-brand-muted flex items-center gap-1.5">
-          <MessageSquare className="h-4 w-4" />
-          Add Approval/Rejection/Revision Remarks
-        </label>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <label htmlFor="approvals-remark" className="text-xs font-bold uppercase tracking-wider text-brand-muted flex items-center gap-1.5">
+            <MessageSquare className="h-4 w-4" />
+            Add Approval/Rejection/Revision Remarks
+          </label>
+          <button
+            type="button"
+            onClick={handleSuggestRemark}
+            disabled={suggestingRemark || isPendingDecision}
+            title="Draft a remark from this timesheet's hours, overtime, and tasks — you edit before deciding"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#c3c6d2] bg-gradient-to-r from-brand/5 to-brand-cyan/5 px-2.5 py-1 text-xs font-semibold text-brand shadow-sm transition-all hover:border-brand hover:from-brand/10 hover:to-brand-cyan/10 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {suggestingRemark ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {suggestingRemark ? "Drafting..." : "Suggest remark with AI"}
+          </button>
+        </div>
         <Textarea
           id="approvals-remark"
           value={remark}

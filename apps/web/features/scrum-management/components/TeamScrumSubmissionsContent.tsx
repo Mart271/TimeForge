@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, Calendar, AlertCircle, MessageSquare, Flag, Loader2, ChevronLeft, ChevronRight, Check, Lock, LockOpen } from "lucide-react";
+import { Search, Calendar, AlertCircle, MessageSquare, Flag, Loader2, ChevronLeft, ChevronRight, Check, Lock, LockOpen, Sparkles, X } from "lucide-react";
 import { getTeamScrums, postScrumComment, postScrumFlag, postScrumUnlock } from "../api/scrum-management.service";
+import { runAndPollAiJob } from "../api/ai-insight.service";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { Avatar } from "@/components/shared/Avatar";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -20,6 +21,23 @@ export function TeamScrumSubmissionsContent() {
 
   // Comments local state map: entryId -> text
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+
+  // BLOCKER_DETECTION — AI analysis of a member's blockers over the last 14
+  // days. Keyed by userId so the result renders inside the right card.
+  const [blockerAnalyzing, setBlockerAnalyzing] = useState<string | null>(null);
+  const [blockerAnalysis, setBlockerAnalysis] = useState<{ userId: string; summary: string; recommendation: string } | null>(null);
+
+  const handleBlockerAnalysis = async (userId: string) => {
+    setBlockerAnalyzing(userId);
+    try {
+      const result = await runAndPollAiJob("BLOCKER_DETECTION", "user", userId);
+      setBlockerAnalysis({ userId, summary: result.summary, recommendation: result.recommendation });
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : "AI blocker analysis failed.", tone: "error" });
+    } finally {
+      setBlockerAnalyzing(null);
+    }
+  };
 
   // Unlock modal: the entry being unlocked + the optional reason draft.
   const [unlockTarget, setUnlockTarget] = useState<{ id: string; name: string } | null>(null);
@@ -152,6 +170,16 @@ export function TeamScrumSubmissionsContent() {
                   <span className="text-xs text-brand-muted">
                     {item.user.department?.name || "Unassigned"} • {new Date(item.entryDate).toLocaleDateString()}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => handleBlockerAnalysis(item.userId)}
+                    disabled={blockerAnalyzing !== null}
+                    title="AI analysis of this member's blockers over the last 14 days"
+                    className="inline-flex items-center gap-1 rounded-lg border border-[#c3c6d2] bg-gradient-to-r from-brand/5 to-brand-cyan/5 px-2 py-0.5 text-xs font-semibold text-brand shadow-sm transition-all hover:border-brand disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {blockerAnalyzing === item.userId ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                    AI Blockers
+                  </button>
                   {item.recurringBlocker ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
                       <AlertCircle className="h-3 w-3" />
@@ -182,6 +210,30 @@ export function TeamScrumSubmissionsContent() {
                   </p>
                 </div>
               </div>
+
+              {blockerAnalysis && blockerAnalysis.userId === item.userId ? (
+                <div className="mb-4 rounded-[12px] border border-brand/25 bg-brand-cyan/5 p-4 text-sm text-brand-ink">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-2">
+                      <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-brand">
+                        <Sparkles className="h-3.5 w-3.5" /> AI Blocker Analysis — last 14 days
+                      </p>
+                      <p className="whitespace-pre-wrap leading-relaxed">{blockerAnalysis.summary}</p>
+                      {blockerAnalysis.recommendation ? (
+                        <p className="whitespace-pre-wrap leading-relaxed text-brand-muted">{blockerAnalysis.recommendation}</p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setBlockerAnalysis(null)}
+                      className="shrink-0 text-brand-muted hover:text-brand-navy"
+                      aria-label="Dismiss blocker analysis"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Left Panel: Progress and Lists */}

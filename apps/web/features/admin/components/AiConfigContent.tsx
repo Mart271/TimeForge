@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Toast, type ToastState } from "@/components/shared/Toast";
 import { getAiConfig, updateAiToggles } from "../api/admin-ai.service";
 
+// Must cover every AiFeature enum value — AiService.checkFeatureEnabled()
+// honors a toggle for any feature key, but a feature missing from this list
+// was invisible here and therefore could never be disabled org-wide.
 const ALL_FEATURES = [
   "DAILY_SUMMARY",
   "WEEKLY_SUMMARY",
@@ -16,6 +19,12 @@ const ALL_FEATURES = [
   "SUPERVISOR_ADVISORY",
   "KPI_ANALYSIS",
   "PAYROLL_VALIDATION",
+  "STANDUP_DRAFT",
+  "BLOCKER_ADVISORY",
+  "KPI_COPILOT",
+  "INTERN_ADVISORY",
+  "IMPROVE_DESCRIPTION",
+  "FINANCE_REPORT",
 ] as const;
 
 const FEATURE_LABELS: Record<string, string> = {
@@ -27,6 +36,12 @@ const FEATURE_LABELS: Record<string, string> = {
   SUPERVISOR_ADVISORY: "Supervisor Advisory",
   KPI_ANALYSIS: "KPI Analysis",
   PAYROLL_VALIDATION: "Payroll Validation",
+  STANDUP_DRAFT: "Daily Standup Composer",
+  BLOCKER_ADVISORY: "Blocker Advisory",
+  KPI_COPILOT: "KPI Goal Copilot",
+  INTERN_ADVISORY: "Intern Advisory",
+  IMPROVE_DESCRIPTION: "Improve with AI (writing assist)",
+  FINANCE_REPORT: "Finance AI Report",
 };
 
 const FEATURE_DESCRIPTIONS: Record<string, string> = {
@@ -38,6 +53,12 @@ const FEATURE_DESCRIPTIONS: Record<string, string> = {
   SUPERVISOR_ADVISORY: "Generates advisory insights for supervisors.",
   KPI_ANALYSIS: "Analyzes KPI progress and generates recommendations.",
   PAYROLL_VALIDATION: "Validates payroll entries using AI anomaly detection.",
+  STANDUP_DRAFT: "Drafts the employee's Daily Scrum standup from their tracked work.",
+  BLOCKER_ADVISORY: "Suggests troubleshooting steps for reported blockers.",
+  KPI_COPILOT: "Personal action checklist for hitting KPI targets (employee dashboard).",
+  INTERN_ADVISORY: "Mentoring feedback and guidance for interns.",
+  IMPROVE_DESCRIPTION: "Rewrites task descriptions and suggests planning fields (Expected Output, Measurement Criteria).",
+  FINANCE_REPORT: "Generates narrative finance reports on demand.",
 };
 
 export function AiConfigContent() {

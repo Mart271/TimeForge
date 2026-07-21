@@ -410,6 +410,16 @@ const improveDescription: FeatureHandler = async (prisma, ctx) => {
     };
   }
 
+  // mode: 'approval-remark' — draft a supervisor's remark for a timesheet
+  // decision from the review context the client passes in options.text.
+  // The supervisor edits before sending; nothing is auto-submitted.
+  if (ctx.options?.mode === 'approval-remark') {
+    return {
+      systemPrompt: `You are a supervisor writing a short, professional remark on an employee's submitted timesheet. Respond with JSON: { "summary": "...", "recommendation": "...", "confidence": 0.0-1.0 }. In "recommendation", write the remark itself: 2-4 sentences, specific to the data provided (acknowledge the work, call out overtime or gaps if present, state what should change if revision is needed). Constructive and human, no corporate filler. In "summary", one sentence describing the overall assessment.`,
+      userPrompt: `Timesheet review context:\n${originalText}`,
+    };
+  }
+
   return {
     systemPrompt: `You are a professional documentation assistant. Rewrite the task description to be clear, descriptive, professional, and outcome-oriented. Respond with JSON: { "summary": "...", "recommendation": "...", "confidence": 0.0-1.0 }. Place the improved, detailed description inside the "recommendation" field, and a brief description of the improvement in the "summary" field.`,
     userPrompt: `Rewrite this vague task description to be professional and detailed:\n"${originalText}"`,
