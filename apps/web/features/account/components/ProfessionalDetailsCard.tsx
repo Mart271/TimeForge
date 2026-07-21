@@ -161,7 +161,9 @@ export function ProfessionalDetailsCard({
 
         <div>
           <Label htmlFor="hourlyRate" className="mb-1.5">Hourly Rate (PHP)</Label>
-          {isEditing && onHourlyRateChange && canEditRate ? (
+          {/* Independent of isEditing: Finance can edit only the rate even
+              though it can't touch department/employment/supervisor (Admin-only). */}
+          {onHourlyRateChange && canEditRate ? (
             <Input
               id="hourlyRate"
               type="number"

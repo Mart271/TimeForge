@@ -25,10 +25,13 @@ interface PersonalInfoCardProps {
   onToast: (t: ToastState) => void;
   /** false when an Admin is viewing another employee — there's no "upload someone else's avatar" capability. */
   allowAvatarUpload?: boolean;
+  /** true when a non-Admin (e.g. Supervisor) is viewing someone else's profile — Full Name/Phone
+   *  become disabled instead of live-editable, since only Admin can actually save these fields. */
+  readOnly?: boolean;
 }
 
 /** Editable personal info fields (name/phone) + avatar upload. Full Name/Phone are registered into the parent form; avatar upload is its own immediate action. Email is read-only. */
-export function PersonalInfoCard({ me, register, errors, onToast, allowAvatarUpload = true }: PersonalInfoCardProps) {
+export function PersonalInfoCard({ me, register, errors, onToast, allowAvatarUpload = true, readOnly = false }: PersonalInfoCardProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -102,11 +105,11 @@ export function PersonalInfoCard({ me, register, errors, onToast, allowAvatarUpl
           <Label htmlFor="firstName" className="mb-1.5">Full Name</Label>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Input id="firstName" aria-invalid={Boolean(errors.firstName)} {...register("firstName")} />
+              <Input id="firstName" disabled={readOnly} aria-invalid={Boolean(errors.firstName)} {...register("firstName")} />
               <FieldError message={errors.firstName?.message} />
             </div>
             <div>
-              <Input id="lastName" aria-invalid={Boolean(errors.lastName)} {...register("lastName")} />
+              <Input id="lastName" disabled={readOnly} aria-invalid={Boolean(errors.lastName)} {...register("lastName")} />
               <FieldError message={errors.lastName?.message} />
             </div>
           </div>
@@ -119,7 +122,7 @@ export function PersonalInfoCard({ me, register, errors, onToast, allowAvatarUpl
 
         <div>
           <Label htmlFor="phone" className="mb-1.5">Phone Number</Label>
-          <Input id="phone" aria-invalid={Boolean(errors.phone)} {...register("phone")} />
+          <Input id="phone" disabled={readOnly} aria-invalid={Boolean(errors.phone)} {...register("phone")} />
           <FieldError message={errors.phone?.message} />
         </div>
       </div>

@@ -35,11 +35,17 @@ export function ProfileAccountModal() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
   const { user } = useAuth();
+  const isAdmin = user?.roles.includes("ADMIN") || false;
   const isAdminOrFinance = user?.roles.some((r) => r === "ADMIN" || r === "FINANCE") || false;
 
   /** null targetUserId = "my own" profile (self-service, full editing incl. avatar/security);
-   *  set = an Admin viewing/editing another employee from Employee Management (no avatar/security actions). */
+   *  set = viewing another employee's profile (from Employee Management, or a Supervisor
+   *  opening a team member's card). Only Admin can edit name/department/employment/
+   *  supervisor here; Finance may additionally edit the hourly rate. Anyone else viewing
+   *  someone else's profile (e.g. Supervisor) gets a read-only view — the backend
+   *  (user:update) would reject their edits anyway, so the UI shouldn't offer them. */
   const isViewingOther = Boolean(targetUserId);
+  const canEditOtherProfile = isViewingOther && isAdmin;
 
   // Admin-only: editable professional fields
   const [editDepartmentId, setEditDepartmentId] = useState<string>("");
@@ -100,15 +106,23 @@ export function ProfileAccountModal() {
       if (isViewingOther) {
         let currentVersion = (meQuery.data as EmployeeRow).version;
         const originalRate = meQuery.data?.hourlyRate != null ? String(meQuery.data.hourlyRate) : "";
-        
+        const rateChanged = isAdminOrFinance && editHourlyRate !== originalRate;
+
         // If hourly rate changed and viewer has permission, update the rate first
-        if (isAdminOrFinance && editHourlyRate !== originalRate) {
+        if (rateChanged) {
           const rateVal = parseFloat(editHourlyRate) || 0;
           const rateRes = await apiClient.patch(`/payroll/rates/${targetUserId}`, null, {
             params: { rate: rateVal, version: currentVersion },
           });
           // The rate update increments the user's version, so we must use the new version for updateEmployee
           currentVersion = rateRes.data.version;
+        }
+
+        // A non-Admin viewer (e.g. Finance, editing only the rate) doesn't hold
+        // user:update — calling updateEmployee for them would 403. Only Admin
+        // touches name/department/employment/supervisor via this endpoint.
+        if (!canEditOtherProfile) {
+          return rateChanged ? getEmployee(targetUserId!) : (meQuery.data as EmployeeRow);
         }
 
         return updateEmployee(targetUserId!, {
@@ -201,10 +215,11 @@ export function ProfileAccountModal() {
                     errors={errors}
                     onToast={setToast}
                     allowAvatarUpload={!isViewingOther}
+                    readOnly={isViewingOther && !canEditOtherProfile}
                   />
                   <ProfessionalDetailsCard
                     me={meQuery.data}
-                    isEditing={isViewingOther}
+                    isEditing={isViewingOther ? canEditOtherProfile : false}
                     departments={departments ?? []}
                     supervisors={supervisors}
                     selectedDepartmentId={editDepartmentId}
@@ -226,16 +241,21 @@ export function ProfileAccountModal() {
           {meQuery.data ? (
             <div className="flex items-center justify-end gap-3 border-t border-[#c3c6d2]/50 px-6 py-4">
               <Button type="button" variant="outline" onClick={close}>
-                Cancel
+                {isViewingOther && !canEditOtherProfile && !isAdminOrFinance ? "Close" : "Cancel"}
               </Button>
-              <Button
-                type="button"
-                onClick={handleSubmit((values) => saveProfile.mutate(values))}
-                disabled={saveProfile.isPending}
-              >
-                {saveProfile.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-                Save Changes
-              </Button>
+              {/* Nothing is editable for a viewer who is neither Admin nor
+                  Finance looking at someone else's profile (e.g. Supervisor) —
+                  read-only, so there's nothing to save. */}
+              {!isViewingOther || canEditOtherProfile || isAdminOrFinance ? (
+                <Button
+                  type="button"
+                  onClick={handleSubmit((values) => saveProfile.mutate(values))}
+                  disabled={saveProfile.isPending}
+                >
+                  {saveProfile.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
+                  Save Changes
+                </Button>
+              ) : null}
             </div>
           ) : null}
         </DialogContent>
