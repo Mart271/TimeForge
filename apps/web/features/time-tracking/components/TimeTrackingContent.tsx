@@ -136,7 +136,12 @@ export function TimeTrackingContent() {
     return (
       [...all]
         .filter((e) => e.supervisorNote && e.supervisorNote.trim().length > 0)
-        .sort((a, b) => b.entryDate.localeCompare(a.entryDate))[0] ?? null
+        // Sort by when the comment was actually posted (updatedAt), not which
+        // scrum day it's attached to (entryDate). A supervisor can comment on
+        // an older backlogged entry after already commenting on a newer one —
+        // sorting by entryDate would keep showing the newer entry's stale
+        // comment forever, hiding the one that was just posted.
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null
     );
   }, [historyQuery.data]);
 
