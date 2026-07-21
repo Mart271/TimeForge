@@ -73,6 +73,11 @@ export function TimeTrackingContent() {
     queryFn: () => listScrumEntries({ from: toIsoDate(today), to: toIsoDate(today), limit: 1 }),
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
+    // Belt-and-suspenders alongside the Realtime broadcast invalidation
+    // (useNotificationsRealtime): if the websocket drops or a broadcast is
+    // missed, a supervisor comment left while this tab sits open and focused
+    // would otherwise never appear without a manual reload.
+    refetchInterval: 60_000,
   });
 
   const deepLinkQuery = useQuery({
@@ -111,6 +116,7 @@ export function TimeTrackingContent() {
     queryFn: () => listScrumEntries({ limit: 30 }),
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
+    refetchInterval: 60_000,
   });
 
   const scrumEntry = useMemo(() => {

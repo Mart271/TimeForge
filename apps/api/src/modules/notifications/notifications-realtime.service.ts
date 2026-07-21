@@ -48,10 +48,35 @@ export class NotificationsRealtimeService {
     await this.send(userId, 'count_changed', {});
   }
 
+  /**
+   * A freshly created channel's websocket handshake isn't done yet the
+   * instant `.channel()` returns — calling `.send()` immediately raced that
+   * handshake and silently dropped the broadcast whenever it lost (the exact
+   * "sometimes updates, sometimes doesn't" symptom). Waiting for the
+   * subscribe callback to report SUBSCRIBED guarantees the send actually
+   * goes out; a timeout keeps a stalled realtime connection from hanging
+   * this fire-and-forget call forever (callers already treat it as
+   * best-effort via `.catch()`).
+   */
   private async send(userId: string, event: string, payload: Record<string, unknown>): Promise<void> {
     if (!this.client) return;
     const channel = this.client.channel(NotificationsRealtimeService.channelName(userId));
-    await channel.send({ type: 'broadcast', event, payload });
-    await this.client.removeChannel(channel);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Realtime subscribe timed out')), 5000);
+        channel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            clearTimeout(timeout);
+            resolve();
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            clearTimeout(timeout);
+            reject(new Error(`Realtime channel subscribe failed: ${status}`));
+          }
+        });
+      });
+      await channel.send({ type: 'broadcast', event, payload });
+    } finally {
+      await this.client.removeChannel(channel);
+    }
   }
 }
