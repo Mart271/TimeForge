@@ -51,10 +51,11 @@ export function UserMenu() {
   // this would otherwise retry a permanent 403 forever.
   const isExcludedRole = user?.roles.some((r) => r === "HR" || r === "FINANCE") ?? false;
   const canHaveWorkSession = !isExcludedRole && hasPermission(user?.roles, "time_entry:read");
-  // Admin/HR/Finance aren't required to clock in — a real session (including a
-  // break) still wins, but absent one their presence dot should read "online"
-  // rather than "offline", which only makes sense for roles that do clock in.
-  const isNonTrackedRole = user?.roles.some((r) => r === "HR" || r === "FINANCE" || r === "ADMIN") ?? false;
+  // Admin/HR/Finance/Supervisor aren't required to clock in — a real session
+  // (including a break) still wins, but absent one their presence dot should
+  // read "online" rather than "offline", which only makes sense for roles
+  // that do clock in.
+  const isNonTrackedRole = user?.roles.some((r) => r === "HR" || r === "FINANCE" || r === "ADMIN" || r === "SUPERVISOR") ?? false;
   // Daily Scrum / Timesheet / Request Leave are individual-contributor actions —
   // only Employees see them here, regardless of what other permissions a role holds.
   const isEmployee = user?.roles.includes("EMPLOYEE") ?? false;
