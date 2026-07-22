@@ -16,6 +16,7 @@ import {
   Plus,
   Sparkles,
   X,
+  Lock,
 } from "lucide-react";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { StatusBadge, type BadgeTone } from "@/components/shared/StatusBadge";
