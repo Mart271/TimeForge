@@ -100,6 +100,7 @@ export function PayrollProcessingContent() {
     queryKey: ["payroll-processing", "report", activePeriodId],
     queryFn: () => getReportByPeriod(activePeriodId as string),
     enabled: Boolean(activePeriodId),
+    refetchInterval: 30_000,
   });
 
   const invalidateAll = () => {
@@ -418,6 +419,29 @@ export function PayrollProcessingContent() {
               <div className="mt-1 text-2xl font-bold">{isReportLoading ? "…" : formatCurrency(totals.pay)}</div>
             </div>
           </div>
+
+          {/* Sync hint: report exists but no approved hours were captured */}
+          {report && totals.approved === 0 && activePeriod?.status !== "EXPORTED" && (
+            <div className="flex items-start gap-3 rounded-[12px] border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="font-semibold">No approved hours found in this period</p>
+                <p className="mt-0.5 text-xs text-amber-700">
+                  If timesheets were recently approved by a supervisor, click <strong>Recalculate All</strong> to sync the latest data into the payroll table.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => generateMutation.mutate()}
+                disabled={!canRecalculate || isBusy}
+                className="shrink-0 border-amber-300 bg-white text-xs text-amber-700 hover:bg-amber-50"
+              >
+                {generateMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                Recalculate
+              </Button>
+            </div>
+          )}
 
           {/* Employee table */}
           <SectionCard

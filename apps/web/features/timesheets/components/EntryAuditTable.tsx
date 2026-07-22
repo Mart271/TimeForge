@@ -92,28 +92,42 @@ export function EntryAuditTable({ entries, overtimeDays, periodDayCount, timeshe
   const updateMutation = useMutation({
     mutationFn: async () => {
       if (!editingEntry) return;
-      if (!editDate || !editStartTime) {
-        throw new Error("Date and Start Time are required");
-      }
-      const startTime = combineDateAndTime(editDate, editStartTime);
-      const endTime = editEndTime ? combineDateAndTime(editDate, editEndTime) : undefined;
-      
-      if (endTime && new Date(endTime) <= new Date(startTime)) {
-        throw new Error("End Time must be after Start Time");
-      }
 
-      await updateTimeEntry(editingEntry.id, {
-        startTime,
-        endTime,
-        projectId: editProjectId || undefined,
-        clientId: editClientId || undefined,
-        workCategoryId: editWorkCategoryId || undefined,
-        departmentId: editDepartmentId || undefined,
-        task: editTask || undefined,
-        description: editDescription || undefined,
-        deliverables: editDeliverables || undefined,
-        version: editingEntry.version,
-      });
+      // In revision mode, start/end times are locked — only text fields may change.
+      if (!isRevisionMode) {
+        if (!editDate || !editStartTime) {
+          throw new Error("Date and Start Time are required");
+        }
+        const startTime = combineDateAndTime(editDate, editStartTime);
+        const endTime = editEndTime ? combineDateAndTime(editDate, editEndTime) : undefined;
+        if (endTime && new Date(endTime) <= new Date(startTime)) {
+          throw new Error("End Time must be after Start Time");
+        }
+        await updateTimeEntry(editingEntry.id, {
+          startTime,
+          endTime,
+          projectId: editProjectId || undefined,
+          clientId: editClientId || undefined,
+          workCategoryId: editWorkCategoryId || undefined,
+          departmentId: editDepartmentId || undefined,
+          task: editTask || undefined,
+          description: editDescription || undefined,
+          deliverables: editDeliverables || undefined,
+          version: editingEntry.version,
+        });
+      } else {
+        // Revision mode: only update editable text fields, preserve original times.
+        await updateTimeEntry(editingEntry.id, {
+          projectId: editProjectId || undefined,
+          clientId: editClientId || undefined,
+          workCategoryId: editWorkCategoryId || undefined,
+          departmentId: editDepartmentId || undefined,
+          task: editTask || undefined,
+          description: editDescription || undefined,
+          deliverables: editDeliverables || undefined,
+          version: editingEntry.version,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["timesheets"] });
@@ -143,7 +157,8 @@ export function EntryAuditTable({ entries, overtimeDays, periodDayCount, timeshe
   });
 
   const visible = expanded ? entries : entries.slice(0, COLLAPSED_ROWS);
-  const canEdit = timesheetStatus === "DRAFT" || timesheetStatus === "REJECTED";
+  const canEdit = timesheetStatus === "DRAFT" || timesheetStatus === "REJECTED" || timesheetStatus === "REVISION_REQUESTED";
+  const isRevisionMode = timesheetStatus === "REVISION_REQUESTED";
 
   const columns: DataTableColumn<TimeEntry>[] = [
     {
@@ -294,11 +309,19 @@ export function EntryAuditTable({ entries, overtimeDays, periodDayCount, timeshe
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[#c3c6d2]/30 pb-3 mb-4">
-              <h3 className="text-lg font-bold text-brand-navy">Edit Time Entry</h3>
+              <h3 className="text-lg font-bold text-brand-navy">
+                {isRevisionMode ? "Revise Entry" : "Edit Time Entry"}
+              </h3>
               <button type="button" onClick={() => setEditingEntry(null)} className="text-brand-muted hover:text-brand-ink">
                 <X className="h-5 w-5" />
               </button>
             </div>
+
+            {isRevisionMode && (
+              <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 text-xs text-amber-800">
+                <span className="font-bold">Revision mode: </span>Start time, end time, and date are locked. You may update the description, deliverables, task, project, client, and department.
+              </div>
+            )}
 
             {formError && (
               <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg p-3">
@@ -309,31 +332,49 @@ export function EntryAuditTable({ entries, overtimeDays, periodDayCount, timeshe
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-brand-muted block mb-1">Date *</label>
-                  <input
-                    type="date"
-                    value={editDate}
-                    onChange={(e) => setEditDate(e.target.value)}
-                    className="w-full h-10 rounded-lg border border-[#c3c6d2] px-3 text-sm focus:border-brand outline-none"
-                  />
+                  <label className="text-xs font-semibold text-brand-muted block mb-1">Date {!isRevisionMode && "*"}</label>
+                  {isRevisionMode ? (
+                    <div className="h-10 rounded-lg border border-[#c3c6d2]/50 bg-[#f6f3f4] px-3 text-sm text-brand-muted flex items-center cursor-not-allowed">
+                      {editDate}
+                    </div>
+                  ) : (
+                    <input
+                      type="date"
+                      value={editDate}
+                      onChange={(e) => setEditDate(e.target.value)}
+                      className="w-full h-10 rounded-lg border border-[#c3c6d2] px-3 text-sm focus:border-brand outline-none"
+                    />
+                  )}
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-brand-muted block mb-1">Start Time *</label>
-                  <input
-                    type="time"
-                    value={editStartTime}
-                    onChange={(e) => setEditStartTime(e.target.value)}
-                    className="w-full h-10 rounded-lg border border-[#c3c6d2] px-3 text-sm focus:border-brand outline-none"
-                  />
+                  <label className="text-xs font-semibold text-brand-muted block mb-1">Start Time {!isRevisionMode && "*"}</label>
+                  {isRevisionMode ? (
+                    <div className="h-10 rounded-lg border border-[#c3c6d2]/50 bg-[#f6f3f4] px-3 text-sm text-brand-muted flex items-center cursor-not-allowed">
+                      {editStartTime}
+                    </div>
+                  ) : (
+                    <input
+                      type="time"
+                      value={editStartTime}
+                      onChange={(e) => setEditStartTime(e.target.value)}
+                      className="w-full h-10 rounded-lg border border-[#c3c6d2] px-3 text-sm focus:border-brand outline-none"
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-brand-muted block mb-1">End Time</label>
-                  <input
-                    type="time"
-                    value={editEndTime}
-                    onChange={(e) => setEditEndTime(e.target.value)}
-                    className="w-full h-10 rounded-lg border border-[#c3c6d2] px-3 text-sm focus:border-brand outline-none"
-                  />
+                  {isRevisionMode ? (
+                    <div className="h-10 rounded-lg border border-[#c3c6d2]/50 bg-[#f6f3f4] px-3 text-sm text-brand-muted flex items-center cursor-not-allowed">
+                      {editEndTime || "—"}
+                    </div>
+                  ) : (
+                    <input
+                      type="time"
+                      value={editEndTime}
+                      onChange={(e) => setEditEndTime(e.target.value)}
+                      className="w-full h-10 rounded-lg border border-[#c3c6d2] px-3 text-sm focus:border-brand outline-none"
+                    />
+                  )}
                 </div>
               </div>
 

@@ -278,7 +278,7 @@ export function AddShiftDrawer({ open, onOpenChange, onToast, managedDeptIds }: 
           : (publish ? "Shift published." : "Draft saved."),
         tone: "success"
       });
-      queryClient.invalidateQueries({ queryKey: ["schedules"] });
+      queryClient.resetQueries({ queryKey: ["schedules"] });
       if (publish) {
         clearLocalDraft();
         reset();

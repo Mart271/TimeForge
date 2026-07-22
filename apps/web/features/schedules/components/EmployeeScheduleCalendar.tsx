@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useQueries } from "@tanstack/react-query";
+import { useMemo, useState, useEffect } from "react";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCalendar, type ShiftRow } from "../api/schedules.service";
@@ -67,6 +67,24 @@ export function EmployeeScheduleCalendar() {
       refetchOnWindowFocus: true,
     })),
   });
+
+  // Prefetch the next 2 months in the background so the employee sees
+  // recurring shifts instantly when navigating forward.
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    for (let offset = 1; offset <= 2; offset++) {
+      const futureMonth = (month + offset) % 12;
+      const futureYear = year + Math.floor((month + offset) / 12);
+      const futureWeeks = weeksInMonth(futureYear, futureMonth);
+      futureWeeks.forEach((ws) => {
+        queryClient.prefetchQuery({
+          queryKey: ["schedules", "calendar", ws],
+          queryFn: () => getCalendar({ weekStart: ws }),
+          staleTime: 10_000,
+        });
+      });
+    }
+  }, [year, month, queryClient]);
 
   const isLoading = weekQueries.some((q) => q.isLoading);
 
