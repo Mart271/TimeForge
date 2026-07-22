@@ -17,6 +17,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "db:rls": "node scripts/apply-rls.js",
     "db:seed": "ts-node -r tsconfig-paths/register prisma/seed.ts",
+    "db:sync-permissions": "ts-node -r tsconfig-paths/register scripts/sync-role-permissions.ts",
     "test": "jest"
   },
   "prisma": {

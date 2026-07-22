@@ -37,7 +37,12 @@ export class AiController {
 
     @Post('jobs')
   @HttpCode(202)
-  @RequirePermissions('ai:trigger_self')
+  // No @RequirePermissions here — which permission is actually required
+  // (ai:trigger_self / _team / _org) depends on the requested feature, and
+  // AiService.triggerJob() already resolves and enforces the right one per
+  // feature. A blanket ai:trigger_self gate here previously 403'd any role
+  // that only has _team/_org (e.g. HR/Finance triggering PAYROLL_VALIDATION,
+  // an org-scoped feature) even though the service would have allowed it.
   @ApiOperation({ summary: 'Trigger an async AI feature job. Returns 202 with jobId.' })
   @ApiHeader({ name: 'Idempotency-Key', required: true, description: 'Dedup key per subject+version' })
   triggerJob(
