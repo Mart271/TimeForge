@@ -83,6 +83,13 @@ export class PayrollService {
    * Line items snapshot hourlyRate/estimatedPay at generation time. When payroll
    * was generated before a rate was configured, fall back to the employee's
    * current rate so payslip PDFs match the employee self-view.
+   *
+   * Gross is always derived from the same regular/overtime figures shown in the
+   * breakdown (never read from the stored estimatedPay snapshot) — approvedHours
+   * can be revised after estimatedPay was first computed (e.g. a timesheet
+   * correction), and nothing recalculates that stored value when it does. Using
+   * it directly for Gross Earnings let the payslip show a breakdown that didn't
+   * sum to its own total.
    */
   private resolvePayslipEarnings(
     item: {
@@ -103,11 +110,7 @@ export class PayrollService {
 
     const regPay = regular * rate;
     const otPay = overtime * rate * 1.25;
-
-    let gross = Number(item.estimatedPay ?? 0);
-    if (gross <= 0 && rate > 0) {
-      gross = regPay + otPay;
-    }
+    const gross = regPay + otPay;
 
     return { rate, regular, overtime, regPay, otPay, gross };
   }
