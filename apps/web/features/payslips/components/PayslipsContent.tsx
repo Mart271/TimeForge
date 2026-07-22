@@ -133,7 +133,24 @@ export function PayslipsContent() {
         if (rate == null) {
           return <span className="text-brand-muted italic">Not Set</span>;
         }
-        return `₱${(hoursOf(item) * rate).toFixed(2)}`;
+        const periodStatus = item.payrollReport.period.status;
+        const isFinalized = periodStatus === "LOCKED" || periodStatus === "EXPORTED";
+        const grossAmount = `₱${(hoursOf(item) * rate).toFixed(2)}`;
+        if (!isFinalized) {
+          return (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-600">
+                    ~{grossAmount} Est.
+                  </span>
+                }
+              />
+              <TooltipContent>This is an estimated amount — the payroll period is still being processed and the figure may change.</TooltipContent>
+            </Tooltip>
+          );
+        }
+        return <span className="font-semibold">{grossAmount}</span>;
       },
     },
     {
@@ -145,22 +162,41 @@ export function PayslipsContent() {
       key: "action",
       header: "Action",
       className: "text-right",
-      render: (item) => (
-        <button
-          type="button"
-          disabled={downloadPayslipMutation.isPending}
-          onClick={() => downloadPayslipMutation.mutate(item.id)}
-          className="rounded-full p-2 text-brand hover:bg-brand/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {downloadPayslipMutation.isPending && downloadPayslipMutation.variables === item.id ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Download className="h-4 w-4" aria-hidden="true" />
-          )}
-        </button>
-      ),
+      render: (item) => {
+        const periodStatus = item.payrollReport.period.status;
+        const isFinalized = periodStatus === "LOCKED" || periodStatus === "EXPORTED";
+        if (!isFinalized) {
+          return (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-brand-muted cursor-default">
+                    <Clock3 className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                }
+              />
+              <TooltipContent>Payslip download is available once this period is finalized.</TooltipContent>
+            </Tooltip>
+          );
+        }
+        return (
+          <button
+            type="button"
+            disabled={downloadPayslipMutation.isPending}
+            onClick={() => downloadPayslipMutation.mutate(item.id)}
+            className="rounded-full p-2 text-brand hover:bg-brand/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {downloadPayslipMutation.isPending && downloadPayslipMutation.variables === item.id ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" aria-hidden="true" />
+            )}
+          </button>
+        );
+      },
     },
   ];
+
 
   if (meQuery.data?.employmentType === "INTERN") {
     return (
