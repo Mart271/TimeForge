@@ -17,7 +17,6 @@ import {
   Download,
   History,
   Users,
-  Receipt,
   ShieldCheck,
   Pencil,
 } from "lucide-react";
@@ -478,7 +477,7 @@ export function FinancePayrollProcessingContent() {
             </div>
             <div className="rounded-[16px] border border-[#c3c6d2]/50 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2 text-brand-muted">
-                <Receipt className="h-5 w-5" />
+                <PesoIcon className="h-5 w-5" />
                 <span className="text-sm">Estimated Tax (15%)</span>
               </div>
               <p className="mt-2 text-2xl font-bold text-brand-ink">{formatCurrency(estimatedTax)}</p>
