@@ -313,6 +313,7 @@ export class ScrumService {
     const entry = await this.ownEntry(p, entryId);
     if (entry.isLocked) throw new ConflictException('Today\'s scrum plan is locked');
     await this.validateProjectRef(p, dto.projectId);
+    const kpiFields = await this.resolveKpiTemplateFields(p, dto.kpiTemplateId);
 
     const task = await this.prisma.scrumTask.create({
       data: {
@@ -326,8 +327,9 @@ export class ScrumService {
         measurement: dto.measurement,
         projectId: dto.projectId ?? null,
         priority: dto.priority ?? 'MEDIUM',
-        kpi: dto.kpi ?? null,
-        plannedTarget: dto.plannedTarget ?? null,
+        kpiTemplateId: dto.kpiTemplateId ?? null,
+        kpi: kpiFields?.kpi ?? dto.kpi ?? null,
+        plannedTarget: kpiFields?.plannedTarget ?? dto.plannedTarget ?? null,
         estimatedHours: dto.estimatedHours ?? null,
         createdBy: p.userId,
         updatedBy: p.userId,
@@ -342,6 +344,7 @@ export class ScrumService {
     if (task.version !== dto.version) throw new ConflictException('Version mismatch');
     await this.assertEntryUnlocked(task.scrumEntryId);
     await this.validateProjectRef(p, dto.projectId);
+    const kpiFields = dto.kpiTemplateId !== undefined ? await this.resolveKpiTemplateFields(p, dto.kpiTemplateId) : null;
 
     const wasCompleted = task.taskStatus === 'COMPLETED';
     const willComplete = dto.taskStatus === 'COMPLETED';
@@ -357,8 +360,9 @@ export class ScrumService {
         taskStatus: dto.taskStatus ?? task.taskStatus,
         completedAt: !wasCompleted && willComplete ? new Date() : wasCompleted && dto.taskStatus && !willComplete ? null : task.completedAt,
         priority: dto.priority ?? task.priority,
-        kpi: dto.kpi !== undefined ? (dto.kpi ?? null) : task.kpi,
-        plannedTarget: dto.plannedTarget !== undefined ? (dto.plannedTarget ?? null) : task.plannedTarget,
+        kpiTemplateId: dto.kpiTemplateId !== undefined ? (dto.kpiTemplateId ?? null) : task.kpiTemplateId,
+        kpi: kpiFields ? kpiFields.kpi : dto.kpi !== undefined ? (dto.kpi ?? null) : task.kpi,
+        plannedTarget: kpiFields ? kpiFields.plannedTarget : dto.plannedTarget !== undefined ? (dto.plannedTarget ?? null) : task.plannedTarget,
         estimatedHours: dto.estimatedHours ?? task.estimatedHours,
         actualHours: dto.actualHours ?? task.actualHours,
         updatedBy: p.userId,
@@ -1099,6 +1103,29 @@ export class ScrumService {
       where: { id: projectId, tenantId: p.tenantId, organizationId: p.organizationId, deletedAt: null },
     });
     if (!project) throw new UnprocessableEntityException('Invalid projectId');
+  }
+
+  /**
+   * When a task links to a real KPI template, its kpi/plannedTarget display
+   * text always mirrors the template (name / targetValue+unit) rather than
+   * trusting client-supplied text for those fields — keeps "Plan New Task"
+   * consistent with whatever an admin configured, per the KPI Management ↔
+   * Daily Scrum integration.
+   */
+  private async resolveKpiTemplateFields(
+    p: AuthPrincipal,
+    kpiTemplateId?: string | null,
+  ): Promise<{ kpi: string; plannedTarget: string } | null> {
+    if (!kpiTemplateId) return null;
+    const template = await this.prisma.kpiTemplate.findFirst({
+      where: { id: kpiTemplateId, tenantId: p.tenantId, organizationId: p.organizationId, deletedAt: null },
+    });
+    if (!template) throw new UnprocessableEntityException('Invalid kpiTemplateId');
+    const target = Number(template.targetValue);
+    return {
+      kpi: template.name,
+      plannedTarget: template.unit ? `${target} ${template.unit}` : `${target}`,
+    };
   }
 
   /**

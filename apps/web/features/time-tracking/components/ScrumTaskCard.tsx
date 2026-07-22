@@ -47,6 +47,7 @@ import {
   type ScrumTaskStatus,
 } from "@/features/scrum/api/scrum.service";
 import { listProjects } from "../api/catalog.service";
+import { getMyKpiSummary } from "@/features/reports/api/kpi.service";
 import { runAndPollAiJob } from "@/features/scrum-management/api/ai-insight.service";
 import { dailyScrumSchema, type DailyScrumValues } from "../schemas/time-entry.schema";
 import { formatClockTime, toIsoDate } from "@/lib/time";
@@ -108,6 +109,11 @@ export function ScrumTaskCard({ entry, loading, onToast }: ScrumTaskCardProps) {
   const [taskCriteria, setTaskCriteria] = useState("");
   const [taskKpi, setTaskKpi] = useState("");
   const [taskTarget, setTaskTarget] = useState("");
+  const [taskKpiTemplateId, setTaskKpiTemplateId] = useState("");
+  // Free-text fallback for teams/departments with no matching KPI template
+  // configured in Admin KPI Management — the dropdown is the default, this
+  // reveals the old manual inputs.
+  const [useCustomKpi, setUseCustomKpi] = useState(false);
   const [taskProj, setTaskProj] = useState("");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [aiSuggesting, setAiSuggesting] = useState(false);
@@ -122,6 +128,14 @@ export function ScrumTaskCard({ entry, loading, onToast }: ScrumTaskCardProps) {
   const newTaskRef = useRef<HTMLDivElement>(null);
 
   const { data: projects } = useQuery({ queryKey: ["catalog", "projects"], queryFn: listProjects });
+  const { data: kpiSummary = [] } = useQuery({ queryKey: ["kpi", "my-summary"], queryFn: getMyKpiSummary });
+  const selectedKpi = kpiSummary.find((k) => k.kpiTemplateId === taskKpiTemplateId);
+
+  // No KPI templates apply to this employee's department/role — skip straight
+  // to the free-text fallback instead of showing an empty, unusable dropdown.
+  useEffect(() => {
+    if (!editingTaskId && kpiSummary.length === 0) setUseCustomKpi(true);
+  }, [kpiSummary, editingTaskId]);
 
   const { data: tasks = [] } = useQuery({
     queryKey: ["scrum-tasks", entry?.id],
@@ -229,8 +243,9 @@ export function ScrumTaskCard({ entry, loading, onToast }: ScrumTaskCardProps) {
         title: taskDesc,
         expectedOutput: taskOutput,
         measurement: taskCriteria,
-        kpi: taskKpi || undefined,
-        plannedTarget: taskTarget || undefined,
+        kpiTemplateId: !useCustomKpi && taskKpiTemplateId ? taskKpiTemplateId : undefined,
+        kpi: useCustomKpi ? (taskKpi || undefined) : undefined,
+        plannedTarget: useCustomKpi ? (taskTarget || undefined) : undefined,
         projectId: taskProj || undefined,
       });
     },
@@ -248,8 +263,12 @@ export function ScrumTaskCard({ entry, loading, onToast }: ScrumTaskCardProps) {
         title: taskDesc,
         expectedOutput: taskOutput,
         measurement: taskCriteria,
-        kpi: taskKpi || undefined,
-        plannedTarget: taskTarget || undefined,
+        // null (not undefined) explicitly clears a previously-linked template
+        // when switching to custom text — omitting it would leave the old
+        // link in place server-side.
+        kpiTemplateId: !useCustomKpi && taskKpiTemplateId ? taskKpiTemplateId : useCustomKpi ? null : undefined,
+        kpi: useCustomKpi ? (taskKpi || undefined) : undefined,
+        plannedTarget: useCustomKpi ? (taskTarget || undefined) : undefined,
         projectId: taskProj || undefined,
         version: task.version,
       }),
@@ -305,6 +324,8 @@ export function ScrumTaskCard({ entry, loading, onToast }: ScrumTaskCardProps) {
     setTaskCriteria("");
     setTaskKpi("");
     setTaskTarget("");
+    setTaskKpiTemplateId("");
+    setUseCustomKpi(false);
     setTaskProj("");
     setEditingTaskId(null);
   };
@@ -328,6 +349,8 @@ export function ScrumTaskCard({ entry, loading, onToast }: ScrumTaskCardProps) {
     setTaskCriteria(item.measurement);
     setTaskKpi(item.kpi ?? "");
     setTaskTarget(item.plannedTarget ?? "");
+    setTaskKpiTemplateId(item.kpiTemplateId ?? "");
+    setUseCustomKpi(!item.kpiTemplateId && Boolean(item.kpi || item.plannedTarget));
     setTaskProj(item.projectId ?? "");
     taskListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
@@ -701,30 +724,80 @@ export function ScrumTaskCard({ entry, loading, onToast }: ScrumTaskCardProps) {
                   ))}
                 </select>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <FieldLabel htmlFor="new-task-kpi">KPI Indicator</FieldLabel>
-                  <input
-                    id="new-task-kpi"
-                    type="text"
-                    value={taskKpi}
-                    onChange={(e) => setTaskKpi(e.target.value)}
-                    placeholder="e.g. Sales, Speed"
-                    className="h-11 w-full rounded-[10px] border border-[#c3c6d2] bg-white px-3 text-sm focus:outline-none focus:border-brand"
-                  />
+              {!useCustomKpi ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <FieldLabel htmlFor="new-task-kpi-template">KPI Indicator</FieldLabel>
+                    <select
+                      id="new-task-kpi-template"
+                      value={taskKpiTemplateId}
+                      onChange={(e) => setTaskKpiTemplateId(e.target.value)}
+                      className="h-11 w-full rounded-[10px] border border-[#c3c6d2] bg-white px-3 text-sm focus:outline-none focus:border-brand"
+                    >
+                      <option value="">
+                        {kpiSummary.length === 0 ? "No KPI metrics configured for you" : "Select a KPI metric…"}
+                      </option>
+                      {kpiSummary.map((k) => (
+                        <option key={k.kpiTemplateId} value={k.kpiTemplateId}>
+                          {k.name} ({k.pct}% of target)
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => { setUseCustomKpi(true); setTaskKpiTemplateId(""); }}
+                      className="mt-1 text-xs font-semibold text-brand hover:underline"
+                    >
+                      Other / Custom KPI…
+                    </button>
+                  </div>
+                  <div>
+                    <FieldLabel htmlFor="new-task-target">Planned Target</FieldLabel>
+                    <input
+                      id="new-task-target"
+                      type="text"
+                      readOnly
+                      value={selectedKpi ? `${selectedKpi.target}${selectedKpi.unit ? ` ${selectedKpi.unit}` : ""}` : ""}
+                      placeholder="Auto-filled from the selected KPI"
+                      className="h-11 w-full rounded-[10px] border border-[#c3c6d2] bg-[#f6f3f4] px-3 text-sm text-brand-muted"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <FieldLabel htmlFor="new-task-target">Planned Target</FieldLabel>
-                  <input
-                    id="new-task-target"
-                    type="text"
-                    value={taskTarget}
-                    onChange={(e) => setTaskTarget(e.target.value)}
-                    placeholder="e.g. 5 deals, 10 hours"
-                    className="h-11 w-full rounded-[10px] border border-[#c3c6d2] bg-white px-3 text-sm focus:outline-none focus:border-brand"
-                  />
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <FieldLabel htmlFor="new-task-kpi">KPI Indicator</FieldLabel>
+                      <button
+                        type="button"
+                        onClick={() => { setUseCustomKpi(false); setTaskKpi(""); setTaskTarget(""); }}
+                        className="text-xs font-semibold text-brand hover:underline"
+                      >
+                        Use a configured KPI
+                      </button>
+                    </div>
+                    <input
+                      id="new-task-kpi"
+                      type="text"
+                      value={taskKpi}
+                      onChange={(e) => setTaskKpi(e.target.value)}
+                      placeholder="e.g. Sales, Speed"
+                      className="h-11 w-full rounded-[10px] border border-[#c3c6d2] bg-white px-3 text-sm focus:outline-none focus:border-brand"
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel htmlFor="new-task-target">Planned Target</FieldLabel>
+                    <input
+                      id="new-task-target"
+                      type="text"
+                      value={taskTarget}
+                      onChange={(e) => setTaskTarget(e.target.value)}
+                      placeholder="e.g. 5 deals, 10 hours"
+                      className="h-11 w-full rounded-[10px] border border-[#c3c6d2] bg-white px-3 text-sm focus:outline-none focus:border-brand"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 

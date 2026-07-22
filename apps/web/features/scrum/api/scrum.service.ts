@@ -47,6 +47,7 @@ export interface ScrumTask {
   priority: ScrumTaskPriority;
   kpi: string | null;
   plannedTarget: string | null;
+  kpiTemplateId: string | null;
   createdAt: string;
   updatedAt: string;
   version: number;
@@ -61,6 +62,7 @@ export interface CreateScrumTaskPayload {
   priority?: ScrumTaskPriority;
   kpi?: string;
   plannedTarget?: string;
+  kpiTemplateId?: string;
   estimatedHours?: number;
 }
 
@@ -74,6 +76,8 @@ export interface UpdateScrumTaskPayload {
   priority?: ScrumTaskPriority;
   kpi?: string;
   plannedTarget?: string;
+  /** null explicitly clears an existing template link (switching to custom); omit to leave unchanged. */
+  kpiTemplateId?: string | null;
   estimatedHours?: number;
   actualHours?: number;
   version: number;

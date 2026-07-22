@@ -757,8 +757,13 @@ model ScrumTask {
   estimatedHours Decimal?            @map("estimated_hours") @db.Decimal(6, 2)
   actualHours    Decimal?            @map("actual_hours") @db.Decimal(6, 2)
   priority       ScrumTaskPriority   @default(MEDIUM)
+  // kpi/plannedTarget stay free text for tasks with no matching KPI template
+  // (or ones created before this FK existed). When kpiTemplateId is set, the
+  // service overwrites these from the template's name/targetValue/unit, so
+  // they always mirror the linked template rather than trusting client input.
   kpi            String?
   plannedTarget  String?             @map("planned_target")
+  kpiTemplateId  String?             @map("kpi_template_id") @db.Uuid
   createdBy      String?             @map("created_by") @db.Uuid
   updatedBy      String?             @map("updated_by") @db.Uuid
   createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz
@@ -769,6 +774,7 @@ model ScrumTask {
   scrumEntry  ScrumEntry          @relation(fields: [scrumEntryId], references: [id])
   employee    User                @relation(fields: [employeeId], references: [id])
   project     Project?            @relation(fields: [projectId], references: [id])
+  kpiTemplate KpiTemplate?        @relation(fields: [kpiTemplateId], references: [id])
   attachments SessionAttachment[]
 
   @@index([tenantId, scrumEntryId])
@@ -1080,6 +1086,7 @@ model KpiTemplate {
 
   organization Organization  @relation(fields: [tenantId, organizationId], references: [tenantId, id])
   progress     KpiProgress[]
+  scrumTasks   ScrumTask[]
 
   // Uniqueness enforced by a partial unique index (WHERE deleted_at IS NULL) —
   // see migration 20260710000000_soft_delete_partial_unique_indexes.
