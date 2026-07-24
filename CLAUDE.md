@@ -66,6 +66,19 @@ timeforge/
 
 ---
 
+## Bug-fix workflow
+
+Follow this process for every bug fix in this repo:
+
+1. **State scope first.** Before making any change, state which files you intend to touch and why. Do not touch any file outside that list without asking first.
+2. **Read before editing.** Read the existing code path fully before editing — don't guess at function signatures or DB schema.
+3. **Smallest fix wins.** Make the smallest change that fixes the described bug. Do not refactor, rename, or "clean up" unrelated code in the same file.
+4. **Verify with tests.** After the change, run any existing relevant tests (`npm run test` for the affected app) and confirm they pass. If no test covers this path, note that explicitly rather than skipping verification.
+5. **Summarize impact.** Summarize exactly what changed (files + diff summary) and explicitly call out any other feature/module that could be affected by this change, so it can be spot-checked.
+6. **Migrations, not hand edits.** If the fix requires a schema change, generate a Prisma migration — don't hand-edit the DB.
+
+---
+
 ## Supabase integration
 
 Supabase is used as **managed PostgreSQL + object storage** only — NOT Supabase Auth (custom JWT/RBAC).
