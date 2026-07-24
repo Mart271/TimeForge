@@ -14,7 +14,7 @@ import { Toast, type ToastState } from "@/components/shared/Toast";
 import { ApiError } from "@/lib/api/client";
 import { profileSchema, type ProfileValues } from "../schemas/account.schema";
 import { getMe, updateProfile } from "../api/account.service";
-import { getEmployee, updateEmployee, listEmployees, type EmployeeRow } from "@/features/employee-management/api/employee-management.service";
+import { getEmployee, updateEmployee, listEmployees, assignRoles, type EmployeeRow } from "@/features/employee-management/api/employee-management.service";
 import { useProfileModalStore } from "../store/profile-modal.store";
 import { PersonalInfoCard } from "./PersonalInfoCard";
 import { ProfessionalDetailsCard } from "./ProfessionalDetailsCard";
@@ -52,6 +52,7 @@ export function ProfileAccountModal() {
   const [editEmploymentType, setEditEmploymentType] = useState<string>("");
   const [editSupervisorId, setEditSupervisorId] = useState<string>("");
   const [editHourlyRate, setEditHourlyRate] = useState<string>("");
+  const [editRoleKey, setEditRoleKey] = useState<string>("");
 
   const meQuery = useQuery({
     queryKey: isViewingOther ? ["employee-management", "employee", targetUserId] : ["account", "me"],
@@ -96,6 +97,7 @@ export function ProfileAccountModal() {
         setEditEmploymentType(meQuery.data.employmentType ?? "EMPLOYEE");
         setEditSupervisorId(meQuery.data.supervisor?.id ?? "");
         setEditHourlyRate(meQuery.data.hourlyRate != null ? String(meQuery.data.hourlyRate) : "");
+        setEditRoleKey(meQuery.data.roles[0]?.role.key ?? "EMPLOYEE");
       }
     }
   }, [meQuery.data, reset, isViewingOther]);
@@ -125,6 +127,14 @@ export function ProfileAccountModal() {
           return rateChanged ? getEmployee(targetUserId!) : (meQuery.data as EmployeeRow);
         }
 
+        // Promote/demote (Admin only). Separate endpoint from updateEmployee —
+        // replaces the user's whole role set, so it must run before the profile
+        // refetch below so the returned row carries the new role.
+        const originalRoleKey = meQuery.data?.roles[0]?.role.key ?? "EMPLOYEE";
+        if (editRoleKey && editRoleKey !== originalRoleKey) {
+          await assignRoles(targetUserId!, [editRoleKey]);
+        }
+
         return updateEmployee(targetUserId!, {
           ...payload,
           departmentId: editDepartmentId || undefined,
@@ -147,6 +157,7 @@ export function ProfileAccountModal() {
         setEditEmploymentType(updated.employmentType ?? "EMPLOYEE");
         setEditSupervisorId(updated.supervisor?.id ?? "");
         setEditHourlyRate(updated.hourlyRate != null ? String(updated.hourlyRate) : "");
+        setEditRoleKey(updated.roles[0]?.role.key ?? "EMPLOYEE");
       }
       setToast({ message: isViewingOther ? "Employee updated." : "Profile updated.", tone: "success" });
       close();
@@ -173,6 +184,7 @@ export function ProfileAccountModal() {
         setEditEmploymentType(meQuery.data.employmentType ?? "EMPLOYEE");
         setEditSupervisorId(meQuery.data.supervisor?.id ?? "");
         setEditHourlyRate(meQuery.data.hourlyRate != null ? String(meQuery.data.hourlyRate) : "");
+        setEditRoleKey(meQuery.data.roles[0]?.role.key ?? "EMPLOYEE");
       }
     }
     close();
@@ -184,6 +196,7 @@ export function ProfileAccountModal() {
       || editEmploymentType !== (meQuery.data.employmentType ?? "EMPLOYEE")
       || editSupervisorId !== (meQuery.data.supervisor?.id ?? "")
       || editHourlyRate !== (meQuery.data.hourlyRate != null ? String(meQuery.data.hourlyRate) : "")
+      || editRoleKey !== (meQuery.data.roles[0]?.role.key ?? "EMPLOYEE")
     : false;
 
   return (
@@ -226,11 +239,13 @@ export function ProfileAccountModal() {
                     selectedEmploymentType={editEmploymentType}
                     selectedSupervisorId={editSupervisorId}
                     selectedHourlyRate={editHourlyRate}
+                    selectedRoleKey={editRoleKey}
                     canEditRate={isAdminOrFinance}
                     onDepartmentChange={setEditDepartmentId}
                     onEmploymentTypeChange={setEditEmploymentType}
                     onSupervisorChange={setEditSupervisorId}
                     onHourlyRateChange={setEditHourlyRate}
+                    onRoleChange={setEditRoleKey}
                   />
                 </div>
                 {isViewingOther ? null : <SecuritySection me={meQuery.data} onToast={setToast} />}

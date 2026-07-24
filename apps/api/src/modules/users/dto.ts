@@ -92,6 +92,10 @@ export class UpdateUserDto {
   lastName?: string;
 
   @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
   @IsString()
   @MaxLength(30)
   phone?: string;

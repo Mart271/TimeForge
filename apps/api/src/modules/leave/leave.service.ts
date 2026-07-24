@@ -312,6 +312,91 @@ export class LeaveService {
     });
   }
 
+  // ── Return to Work / End Leave Early (self) ───────────────────────────
+
+  async returnFromLeave(p: AuthPrincipal, id: string): Promise<LeaveRequest> {
+    const request = await this.prisma.leaveRequest.findFirst({
+      where: { id, tenantId: p.tenantId, organizationId: p.organizationId, deletedAt: null },
+    });
+    if (!request) throw new NotFoundException('Leave request not found');
+    if (request.userId !== p.userId) {
+      throw new ForbiddenException('You can only confirm return from your own leave');
+    }
+    if (request.status !== 'APPROVED') {
+      throw new ConflictException(`Cannot return early from a leave request with status ${request.status}`);
+    }
+
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    // Set endDate to yesterday so active-leave filter (endDate >= today) no longer matches.
+    const newEndDate = new Date(today);
+    newEndDate.setUTCDate(today.getUTCDate() - 1);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const res = await tx.leaveRequest.update({
+        where: { id },
+        data: {
+          endDate: newEndDate < request.startDate ? request.startDate : newEndDate,
+          updatedBy: p.userId,
+          version: { increment: 1 },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: p.tenantId,
+          actorId: p.userId,
+          action: 'ADMIN_ACTION',
+          entityType: 'leave_request',
+          entityId: id,
+          metadata: { event: 'LEAVE_RETURNED_EARLY', originalEndDate: request.endDate, returnDate: new Date() },
+        },
+      });
+
+      return res;
+    });
+
+    // Notify Supervisor + HR users
+    const requester = await this.prisma.user.findFirst({
+      where: { id: p.userId, tenantId: p.tenantId },
+      select: { supervisorId: true, firstName: true, lastName: true },
+    });
+
+    const hrUsers = await this.prisma.user.findMany({
+      where: {
+        tenantId: p.tenantId,
+        organizationId: p.organizationId,
+        status: 'ACTIVE',
+        deletedAt: null,
+        roles: { some: { role: { key: 'HR' } } },
+      },
+      select: { id: true },
+    });
+
+    const notifyUserIds = new Set<string>();
+    if (requester?.supervisorId) notifyUserIds.add(requester.supervisorId);
+    hrUsers.forEach((h) => notifyUserIds.add(h.id));
+
+    for (const targetUserId of notifyUserIds) {
+      await this.notifications.create({
+        tenantId: p.tenantId,
+        organizationId: p.organizationId,
+        userId: targetUserId,
+        senderId: p.userId,
+        type: 'SUBMISSION',
+        category: 'LEAVE',
+        title: 'Employee returned to work early',
+        message: `${requester?.firstName ?? 'Employee'} ${requester?.lastName ?? ''} has confirmed their return to work and ended their leave.`,
+        priority: 'NORMAL',
+        actionUrl: '/supervisor/leave',
+        actionLabel: 'View Leave Log',
+      });
+    }
+
+    return updated;
+  }
+
   // ── Decision (supervisor / HR / admin) ─────────────────────────────────
 
   async decide(p: AuthPrincipal, id: string, dto: LeaveDecisionDto): Promise<LeaveRequest> {

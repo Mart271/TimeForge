@@ -154,9 +154,9 @@ export class CreateScrumTaskDto {
   @IsEnum(ScrumTaskPriority)
   priority?: ScrumTaskPriority;
 
-  // kpi/plannedTarget are the free-text fallback for teams with no matching
-  // KPI template. When kpiTemplateId is set, the service overwrites both from
-  // the template (name/targetValue/unit) rather than trusting client text.
+  // kpi display text is resolved from the template when kpiTemplateId is set;
+  // plannedTarget is the employee's editable daily commitment (pre-filled from
+  // the template but changeable). Free-text fallback when no template linked.
   @IsOptional()
   @IsString()
   @MaxLength(200)
@@ -166,6 +166,11 @@ export class CreateScrumTaskDto {
   @IsString()
   @MaxLength(200)
   plannedTarget?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  actualCompleted?: string;
 
   @IsOptional()
   @IsUUID()
@@ -219,6 +224,11 @@ export class UpdateScrumTaskDto {
   @IsString()
   @MaxLength(200)
   plannedTarget?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  actualCompleted?: string;
 
   /** null explicitly clears an existing template link (switching to custom text); omit to leave unchanged. */
   @IsOptional()

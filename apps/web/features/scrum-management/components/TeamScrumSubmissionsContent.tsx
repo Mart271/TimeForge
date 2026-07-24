@@ -302,7 +302,7 @@ export function TeamScrumSubmissionsContent({
                                 <span className="text-[11px]">{task.measurement || "—"}</span>
                               </div>
                               {(task.kpi || task.plannedTarget) && (
-                                <div className="col-span-2 grid grid-cols-2 gap-2.5 mt-1 pt-1 border-t border-[#c3c6d2]/10">
+                                <div className="col-span-2 grid grid-cols-3 gap-2.5 mt-1 pt-1 border-t border-[#c3c6d2]/10">
                                   {task.kpi && (
                                     <div>
                                       <span className="font-semibold text-brand-muted block mb-0.5">KPI:</span>
@@ -315,6 +315,12 @@ export function TeamScrumSubmissionsContent({
                                       <span className="text-[11px]">{task.plannedTarget}</span>
                                     </div>
                                   )}
+                                  <div>
+                                    <span className="font-semibold text-brand-muted block mb-0.5">Actual Completed:</span>
+                                    <span className={`text-[11px] ${task.actualCompleted ? "font-semibold text-brand-ink" : "text-brand-muted italic"}`}>
+                                      {task.actualCompleted || "—"}
+                                    </span>
+                                  </div>
                                 </div>
                               )}
                             </div>

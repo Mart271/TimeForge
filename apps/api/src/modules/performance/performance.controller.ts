@@ -34,6 +34,15 @@ export class PerformanceExportDto {
 export class PerformanceController {
   constructor(private readonly svc: PerformanceService) {}
 
+  @Get('users')
+  @RequirePermissions('dashboard:read_self')
+  async getSelectableUsers(
+    @CurrentUser() u: AuthPrincipal,
+    @Query() query: PerformanceQuery,
+  ) {
+    return this.svc.getSelectableEmployees(u, query);
+  }
+
   @Get('dashboard')
   @RequirePermissions('dashboard:read_self')
   async getDashboard(

@@ -478,6 +478,7 @@ export class KpiService {
         tenantId: p.tenantId,
         organizationId: p.organizationId,
         departmentId: { in: deptIds },
+        id: { not: p.userId },
         deletedAt: null,
         status: 'ACTIVE',
       },

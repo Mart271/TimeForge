@@ -100,6 +100,35 @@ export class PerformanceService {
     return [p.userId];
   }
 
+  /**
+   * Returns the list of users/employees the calling user is permitted to browse scorecards for.
+   * Admin/HR: all visible employees (optionally filtered by department).
+   * Supervisor: department/team members managed by the supervisor.
+   * Employee: self only.
+   */
+  async getSelectableEmployees(p: AuthPrincipal, query: PerformanceQuery) {
+    const userIds = await this.getVisibleUserIds(p, query);
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: userIds }, deletedAt: null },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        jobTitle: true,
+        department: { select: { id: true, name: true } },
+      },
+      orderBy: { lastName: 'asc' },
+    });
+    return users.map((u) => ({
+      id: u.id,
+      name: `${u.firstName} ${u.lastName}`,
+      email: u.email,
+      jobTitle: u.jobTitle,
+      department: u.department?.name ?? null,
+    }));
+  }
+
   // Helper to check if a specific single-user is being queried (determines if caching is allowed)
   private isEmployeeSpecific(p: AuthPrincipal, query: PerformanceQuery): boolean {
     const isAdmin = p.permissions.includes('*') || p.roles.includes('ADMIN');

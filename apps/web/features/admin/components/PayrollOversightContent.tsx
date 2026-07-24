@@ -211,8 +211,10 @@ export function PayrollOversightContent() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-[#c3c6d2]/40 text-xs font-semibold text-brand-muted uppercase tracking-wider">
+                  <th className="py-3 px-4">Batch ID</th>
                   <th className="py-3 px-4">Pay Period</th>
                   <th className="py-3 px-4">Department/Entity</th>
+                  <th className="py-3 px-4">Employees</th>
                   <th className="py-3 px-4">Gross Total</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
@@ -222,8 +224,10 @@ export function PayrollOversightContent() {
                 {isDashboardLoading ? (
                   Array.from({ length: 4 }).map((_, i) => (
                     <tr key={i} className="animate-pulse">
+                      <td className="py-4 px-4"><div className="h-4 bg-gray-100 rounded w-20"></div></td>
                       <td className="py-4 px-4"><div className="h-4 bg-gray-100 rounded w-24"></div></td>
                       <td className="py-4 px-4"><div className="h-4 bg-gray-100 rounded w-32"></div></td>
+                      <td className="py-4 px-4"><div className="h-4 bg-gray-100 rounded w-16"></div></td>
                       <td className="py-4 px-4"><div className="h-4 bg-gray-100 rounded w-16"></div></td>
                       <td className="py-4 px-4"><div className="h-6 bg-gray-100 rounded w-16"></div></td>
                       <td className="py-4 px-4"><div className="h-8 bg-gray-100 rounded w-24 ml-auto"></div></td>
@@ -231,7 +235,7 @@ export function PayrollOversightContent() {
                   ))
                 ) : dashboard?.activeRuns.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="text-center py-8 text-brand-muted">
+                    <td colSpan={7} className="text-center py-8 text-brand-muted">
                       No active payroll runs found. Click "New Payrun" to generate one.
                     </td>
                   </tr>
@@ -241,8 +245,15 @@ export function PayrollOversightContent() {
                     if (run.status === "Completed") badgeTone = "success";
                     else if (run.status === "Processing") badgeTone = "info";
 
+                    const deptCode = run.department.replace(/[^a-zA-Z0-9]/g, "").slice(0, 3).toUpperCase() || "GEN";
+                    const batchId = run.batchNumber || run.batchId || `PR-${run.id.slice(0, 5).toUpperCase()}-${deptCode}`;
+                    const empCount = run.employeeCount ?? 0;
+
                     return (
                       <tr key={`${run.id}-${run.department}`} className="hover:bg-[#f8fafc] transition-colors">
+                        <td className="py-4 px-4 font-mono text-xs font-semibold text-brand-navy">
+                          {batchId}
+                        </td>
                         <td className="py-4 px-4 font-medium text-brand-ink">
                           <div>{formatDateRange(run.startDate, run.endDate)}</div>
                           <div className="text-xs text-brand-muted mt-0.5">
@@ -250,6 +261,9 @@ export function PayrollOversightContent() {
                           </div>
                         </td>
                         <td className="py-4 px-4 text-brand-muted">{run.department}</td>
+                        <td className="py-4 px-4 text-brand-ink font-medium">
+                          {empCount} {empCount === 1 ? "Employee" : "Employees"}
+                        </td>
                         <td className="py-4 px-4 font-semibold text-brand-ink">
                           {run.grossTotal > 0 ? `₱${run.grossTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "₱0.00"}
                         </td>

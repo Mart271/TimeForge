@@ -1075,12 +1075,15 @@ export class PayrollService {
       if (per.status === 'EXPORTED') uiStatus = 'Completed';
       else if (per.status === 'GENERATED' || per.status === 'LOCKED') uiStatus = 'Processing';
 
-      const deptSplits = new Map<string, number>();
+      const deptSplits = new Map<string, { grossTotal: number; userIds: Set<string> }>();
       
       if (per.reports.length > 0 && per.reports[0].lineItems.length > 0) {
         for (const item of per.reports[0].lineItems) {
           const deptName = item.user.department?.name ?? 'Operations';
-          deptSplits.set(deptName, (deptSplits.get(deptName) ?? 0) + Number(item.estimatedPay));
+          const current = deptSplits.get(deptName) ?? { grossTotal: 0, userIds: new Set<string>() };
+          current.grossTotal += Number(item.estimatedPay);
+          current.userIds.add(item.userId);
+          deptSplits.set(deptName, current);
         }
       } else {
         const users = await this.prisma.user.findMany({
@@ -1113,22 +1116,30 @@ export class PayrollService {
           const rate = Number(u.hourlyRate ?? 0);
           const estPay = hours * rate;
           const deptName = u.department?.name ?? 'Operations';
-          deptSplits.set(deptName, (deptSplits.get(deptName) ?? 0) + estPay);
+          const current = deptSplits.get(deptName) ?? { grossTotal: 0, userIds: new Set<string>() };
+          current.grossTotal += estPay;
+          current.userIds.add(u.id);
+          deptSplits.set(deptName, current);
         }
       }
 
       if (deptSplits.size === 0) {
-        deptSplits.set('Operations', 0);
+        deptSplits.set('Operations', { grossTotal: 0, userIds: new Set<string>() });
       }
 
-      for (const [deptName, grossTotal] of deptSplits.entries()) {
+      for (const [deptName, data] of deptSplits.entries()) {
+        const deptCode = deptName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase() || 'GEN';
+        const batchNumber = `PR-${per.id.slice(0, 5).toUpperCase()}-${deptCode}`;
         activeRuns.push({
           id: per.id,
+          batchId: batchNumber,
+          batchNumber,
+          employeeCount: data.userIds.size,
           startDate: per.startDate,
           endDate: per.endDate,
           type: per.type,
           department: deptName,
-          grossTotal,
+          grossTotal: data.grossTotal,
           status: uiStatus,
         });
       }

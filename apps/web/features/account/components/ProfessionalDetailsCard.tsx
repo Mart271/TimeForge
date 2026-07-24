@@ -20,6 +20,17 @@ const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
 
 const EMPLOYMENT_TYPES = ["EMPLOYEE", "INTERN", "CONTRACTOR", "PART_TIME", "FULL_TIME"] as const;
 
+/** System roles an Admin may promote/demote a user to (mirrors AssignRolesDto). */
+const ROLE_LABELS: Record<string, string> = {
+  EMPLOYEE: "Employee",
+  SUPERVISOR: "Supervisor",
+  HR: "HR",
+  FINANCE: "Finance",
+  ADMIN: "Admin",
+};
+
+const ROLE_KEYS = ["EMPLOYEE", "SUPERVISOR", "HR", "FINANCE", "ADMIN"] as const;
+
 /** Derives a stable, human-facing employee code from the UUID — no separate field is persisted for it. */
 function employeeCode(id: string): string {
   return `TF-${id.replace(/-/g, "").slice(0, 6).toUpperCase()}`;
@@ -45,11 +56,13 @@ interface ProfessionalDetailsCardProps {
   selectedEmploymentType?: string;
   selectedSupervisorId?: string;
   selectedHourlyRate?: string;
+  selectedRoleKey?: string;
   canEditRate?: boolean;
   onDepartmentChange?: (value: string) => void;
   onEmploymentTypeChange?: (value: string) => void;
   onSupervisorChange?: (value: string) => void;
   onHourlyRateChange?: (value: string) => void;
+  onRoleChange?: (value: string) => void;
 }
 
 export function ProfessionalDetailsCard({
@@ -61,11 +74,13 @@ export function ProfessionalDetailsCard({
   selectedEmploymentType,
   selectedSupervisorId,
   selectedHourlyRate,
+  selectedRoleKey,
   canEditRate = false,
   onDepartmentChange,
   onEmploymentTypeChange,
   onSupervisorChange,
   onHourlyRateChange,
+  onRoleChange,
 }: ProfessionalDetailsCardProps) {
   return (
     <SectionCard title="Professional Details">
@@ -109,6 +124,36 @@ export function ProfessionalDetailsCard({
         <div>
           <Label htmlFor="organization" className="mb-1.5">Organization</Label>
           <Input id="organization" value={me.organization.name} disabled />
+        </div>
+
+        <div>
+          <Label className="mb-1.5">Role</Label>
+          {/* Admin-only promote/demote. Read-only otherwise (incl. your own
+              profile) — roles[0] is the highest-privilege role, sorted server-side. */}
+          {isEditing && onRoleChange ? (
+            <Select
+              value={selectedRoleKey ?? me.roles[0]?.role.key ?? "EMPLOYEE"}
+              onValueChange={(v) => onRoleChange(v ?? "")}
+              items={ROLE_KEYS.map((r) => ({ value: r, label: ROLE_LABELS[r] }))}
+            >
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {ROLE_KEYS.map((r) => (
+                  <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              id="role"
+              value={
+                me.roles[0]?.role.key
+                  ? (ROLE_LABELS[me.roles[0].role.key] ?? me.roles[0].role.name)
+                  : "—"
+              }
+              disabled
+            />
+          )}
         </div>
 
         <div>

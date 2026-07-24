@@ -54,6 +54,13 @@ export class LeaveController {
     return this.svc.cancel(u, id);
   }
 
+  @Post('requests/:id/return-to-work')
+  @HttpCode(200)
+  @RequirePermissions('leave_request:cancel')
+  returnToWork(@CurrentUser() u: AuthPrincipal, @Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.returnFromLeave(u, id);
+  }
+
   @Post('requests/:id/decision')
   @HttpCode(200)
   @RequirePermissions('leave_request:decide')

@@ -8,6 +8,9 @@ export interface DashboardCard {
 
 export interface ActiveRun {
   id: string;
+  batchId?: string;
+  batchNumber?: string;
+  employeeCount?: number;
   startDate: string;
   endDate: string;
   type: string;

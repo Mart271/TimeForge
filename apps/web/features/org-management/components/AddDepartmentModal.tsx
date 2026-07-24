@@ -90,7 +90,7 @@ export function AddDepartmentModal({
         <div className="flex items-start justify-between px-6 pt-6">
           <div>
             <DialogTitle>{isEdit ? "Edit Department" : "Add Department"}</DialogTitle>
-            <DialogDescription>{isEdit ? "Update the department name or reassign its manager." : "Create a new department for your organization."}</DialogDescription>
+            <DialogDescription>{isEdit ? "Update the department name or reassign its supervisor." : "Create a new department for your organization."}</DialogDescription>
           </div>
           <DialogCloseButton />
         </div>
@@ -104,7 +104,7 @@ export function AddDepartmentModal({
           </div>
 
           <div>
-            <Label className="mb-1.5">Department Head (optional)</Label>
+            <Label className="mb-1.5">Department Supervisor (optional)</Label>
             <Controller
               control={control}
               name="managerId"

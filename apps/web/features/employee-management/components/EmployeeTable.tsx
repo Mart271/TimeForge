@@ -42,7 +42,9 @@ import { ImportEmployeesModal } from "./ImportEmployeesModal";
 import type { ToastState } from "@/components/shared/Toast";
 
 const STATUSES = ["PENDING", "INVITED", "ACTIVE", "SUSPENDED", "DEACTIVATED", "REJECTED"];
-const ROLES = ["EMPLOYEE", "SUPERVISOR", "HR", "FINANCE", "ADMIN"];
+// INTERN is an employment type, not a role, but the Role column renders it as
+// one — so it's offered here too and the API matches it on employmentType.
+const ROLES = ["EMPLOYEE", "INTERN", "SUPERVISOR", "HR", "FINANCE", "ADMIN"];
 const TABS = ["ALL", "INVITED", "DEACTIVATED"] as const;
 
 function statusTone(status: string): { label: string; tone: BadgeTone } {

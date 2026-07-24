@@ -18,6 +18,7 @@ import {
   Target,
   ClipboardCheck,
   Sparkles,
+  Shield,
   type LucideIcon,
 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -40,6 +41,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "target": Target,
   "clipboard-check": ClipboardCheck,
   "sparkles": Sparkles,
+  "shield": Shield,
 };
 
 interface SidebarNavItemProps {

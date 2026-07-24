@@ -31,7 +31,8 @@ import {
   getPerformanceKpis,
   getPerformanceHistory,
   getPerformanceCoach,
-  queuePerformanceExport
+  queuePerformanceExport,
+  getSelectablePerformanceUsers,
 } from "../api/performance.service";
 import { getMyKpiSummary } from "../api/kpi.service";
 import { useAuth } from "@/providers/auth-provider";
@@ -61,7 +62,7 @@ function metricLabel(type: string, unit: string | null): string {
 export function PerformanceOversightContent() {
   const { user } = useAuth();
   // Only roles that can see other employees' performance (Admin/HR/Supervisor)
-  // benefit from a search box — a regular employee only ever sees their own
+  // benefit from browsing scorecards — a regular employee only ever sees their own
   // data, so the field would be dead clutter with nothing to search for.
   const canSearchOthers = user?.roles.some((r) => r === "ADMIN" || r === "HR" || r === "SUPERVISOR") ?? false;
   // AI Work Recap triggers OWN-scope features (ai:trigger_self). HR/Finance can
@@ -69,12 +70,19 @@ export function PerformanceOversightContent() {
   // card to avoid showing a button that would 403 on click.
   const canTriggerOwnAi = useCan("ai:trigger_self");
   const [toast, setToast] = useState<ToastState | null>(null);
-  const [search, setSearch] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [timeRange, setTimeRange] = useState("Last 7 Days");
 
   const queryParams = {
-    userId: search || undefined,
+    userId: selectedUserId || undefined,
   };
+
+  // Fetch selectable employees scoped by RBAC rules
+  const { data: selectableUsers = [] } = useQuery({
+    queryKey: ["perf", "selectable-users"],
+    queryFn: () => getSelectablePerformanceUsers(),
+    enabled: canSearchOthers,
+  });
 
   // Queries
   const { data: dashboard, isLoading: isDashLoading, refetch: refetchDash } = useQuery({
@@ -163,14 +171,20 @@ export function PerformanceOversightContent() {
 
         <div className="flex items-center gap-3">
           {canSearchOthers ? (
-            <div className="relative w-60">
-              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-brand-muted" />
-              <Input
-                placeholder="Search Employee ID..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8 h-8.5 text-xs"
-              />
+            <div className="border border-[#c3c6d2] rounded-lg px-2.5 py-1 text-xs font-semibold bg-white flex items-center gap-1.5 cursor-pointer min-w-[220px]">
+              <span className="text-brand-muted shrink-0">Scorecard:</span>
+              <select
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                className="bg-transparent font-bold text-brand-navy outline-none border-none cursor-pointer w-full truncate text-xs"
+              >
+                <option value="">All Visible / Aggregate</option>
+                {selectableUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} {u.department ? `(${u.department})` : ""}
+                  </option>
+                ))}
+              </select>
             </div>
           ) : null}
           <Button
@@ -343,10 +357,10 @@ export function PerformanceOversightContent() {
       </div>
 
       {/* AI Work Recap — wires DAILY_SUMMARY / WEEKLY_SUMMARY (own data only) */}
-      {!search && user?.id && canTriggerOwnAi ? <AiRecapCard userId={user.id} /> : null}
+      {!selectedUserId && user?.id && canTriggerOwnAi ? <AiRecapCard userId={user.id} /> : null}
 
       {/* My KPIs — Target vs Actual (KPI-05, KPI-06) */}
-      {!search && (
+      {!selectedUserId && (
         <SectionCard title="My KPIs — Target vs Actual">
           <p className="text-xs text-brand-muted -mt-4 mb-4">
             Current period progress against your configured KPI targets.

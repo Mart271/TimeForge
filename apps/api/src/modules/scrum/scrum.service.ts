@@ -329,7 +329,8 @@ export class ScrumService {
         priority: dto.priority ?? 'MEDIUM',
         kpiTemplateId: dto.kpiTemplateId ?? null,
         kpi: kpiFields?.kpi ?? dto.kpi ?? null,
-        plannedTarget: kpiFields?.plannedTarget ?? dto.plannedTarget ?? null,
+        plannedTarget: dto.plannedTarget ?? kpiFields?.suggestedTarget ?? null,
+        actualCompleted: dto.actualCompleted ?? null,
         estimatedHours: dto.estimatedHours ?? null,
         createdBy: p.userId,
         updatedBy: p.userId,
@@ -362,7 +363,8 @@ export class ScrumService {
         priority: dto.priority ?? task.priority,
         kpiTemplateId: dto.kpiTemplateId !== undefined ? (dto.kpiTemplateId ?? null) : task.kpiTemplateId,
         kpi: kpiFields ? kpiFields.kpi : dto.kpi !== undefined ? (dto.kpi ?? null) : task.kpi,
-        plannedTarget: kpiFields ? kpiFields.plannedTarget : dto.plannedTarget !== undefined ? (dto.plannedTarget ?? null) : task.plannedTarget,
+        plannedTarget: kpiFields ? (dto.plannedTarget ?? kpiFields.suggestedTarget) : dto.plannedTarget !== undefined ? (dto.plannedTarget ?? null) : task.plannedTarget,
+        actualCompleted: dto.actualCompleted !== undefined ? (dto.actualCompleted ?? null) : task.actualCompleted,
         estimatedHours: dto.estimatedHours ?? task.estimatedHours,
         actualHours: dto.actualHours ?? task.actualHours,
         updatedBy: p.userId,
@@ -1106,16 +1108,15 @@ export class ScrumService {
   }
 
   /**
-   * When a task links to a real KPI template, its kpi/plannedTarget display
-   * text always mirrors the template (name / targetValue+unit) rather than
-   * trusting client-supplied text for those fields — keeps "Plan New Task"
-   * consistent with whatever an admin configured, per the KPI Management ↔
-   * Daily Scrum integration.
+   * When a task links to a real KPI template, `kpi` (display name) is always
+   * resolved from the template. `suggestedTarget` is the admin's master target
+   * formatted as a string — used as a pre-fill suggestion for the employee's
+   * Planned Target, but the employee can override it with their own value.
    */
   private async resolveKpiTemplateFields(
     p: AuthPrincipal,
     kpiTemplateId?: string | null,
-  ): Promise<{ kpi: string; plannedTarget: string } | null> {
+  ): Promise<{ kpi: string; suggestedTarget: string } | null> {
     if (!kpiTemplateId) return null;
     const template = await this.prisma.kpiTemplate.findFirst({
       where: { id: kpiTemplateId, tenantId: p.tenantId, organizationId: p.organizationId, deletedAt: null },
@@ -1124,7 +1125,7 @@ export class ScrumService {
     const target = Number(template.targetValue);
     return {
       kpi: template.name,
-      plannedTarget: template.unit ? `${target} ${template.unit}` : `${target}`,
+      suggestedTarget: template.unit ? `${target} ${template.unit}` : `${target}`,
     };
   }
 

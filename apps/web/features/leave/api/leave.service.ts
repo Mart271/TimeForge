@@ -109,6 +109,11 @@ export async function cancelLeaveRequest(id: string): Promise<LeaveRequest> {
   return data;
 }
 
+export async function returnToWorkFromLeave(id: string): Promise<LeaveRequest> {
+  const { data } = await apiClient.post<LeaveRequest>(`/leave/requests/${id}/return-to-work`);
+  return data;
+}
+
 /** Upload (or replace) the single attachment on a PENDING leave request. */
 export async function uploadLeaveAttachment(id: string, file: File): Promise<LeaveRequest> {
   const form = new FormData();

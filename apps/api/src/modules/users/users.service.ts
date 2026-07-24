@@ -40,6 +40,40 @@ type ProfileUser = Prisma.UserGetPayload<{
   };
 }>;
 
+/**
+ * Highest-privilege role first. The `roles` relation has no guaranteed query
+ * order, but callers (profile badge, directory tables) read `roles[0]` as
+ * "the" role — so a user elevated to SUPERVISOR while keeping their base
+ * EMPLOYEE role must surface as Supervisor, not depend on insertion order.
+ */
+const ROLE_PRIORITY: Record<string, number> = { ADMIN: 0, FINANCE: 1, HR: 2, SUPERVISOR: 3, EMPLOYEE: 4 };
+
+function sortRolesByPrivilege<T extends { role: { key: string } }>(roles: T[]): T[] {
+  return [...roles].sort((a, b) => (ROLE_PRIORITY[a.role.key] ?? 99) - (ROLE_PRIORITY[b.role.key] ?? 99));
+}
+
+/**
+ * Prisma `where` fragment for the directory's Role filter.
+ *
+ * Must be applied inside the query, never as a post-fetch `.filter()` — role
+ * lives on a relation, and post-filtering only sees the current page, silently
+ * dropping matches that fall on later pages.
+ *
+ * INTERN is an employmentType rather than a role, but the directory's Role
+ * column renders it as one, so the filter accepts it and matches on
+ * employmentType to stay consistent with what that column displays.
+ */
+function roleFilterWhere(role: string): Record<string, unknown> {
+  if (role === 'INTERN') return { employmentType: 'INTERN' };
+  if (role === 'EMPLOYEE') {
+    return {
+      employmentType: { not: 'INTERN' },
+      roles: { some: { role: { key: 'EMPLOYEE', deletedAt: null } } },
+    };
+  }
+  return { roles: { some: { role: { key: role, deletedAt: null } } } };
+}
+
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 const AVATAR_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 
@@ -122,23 +156,18 @@ export class UsersService {
       ];
     }
 
-    // Total reflects status/department/search filters (role is a post-filtered
-    // relation below, so it isn't reflected here — matches this endpoint's
-    // pre-existing role-filter limitation, not something newly introduced).
-    const totalPromise = query.role ? null : this.prisma.user.count({ where: baseWhere });
+    if (query.role) Object.assign(baseWhere, roleFilterWhere(query.role));
+
+    // Total now reflects every filter, role included.
+    const totalPromise = this.prisma.user.count({ where: baseWhere });
 
     const cursorWhere = query.cursor ? { id: { gt: decodeCursor(query.cursor) } } : {};
-    let users = await this.prisma.user.findMany({
+    const users = await this.prisma.user.findMany({
       where: { ...baseWhere, ...cursorWhere },
       include: { roles: { include: { role: true } }, department: { select: { id: true, name: true } } },
       orderBy: { lastName: 'asc' },
       take: limit + 1,
     });
-
-    // Filter by role key if requested (post-filter — role is a relation)
-    if (query.role) {
-      users = users.filter((u) => u.roles.some((ur) => ur.role.key === query.role));
-    }
 
     const [page, total] = await Promise.all([Promise.resolve(buildPage(users, limit)), totalPromise]);
 
@@ -158,6 +187,9 @@ export class UsersService {
     return {
       data: page.data.map((u) => ({
         ...this.sanitize(u as unknown as Record<string, unknown>, caller),
+        // Same highest-privilege-first ordering the profile endpoints use, so
+        // the directory's role column matches the profile badge.
+        roles: sortRolesByPrivilege(u.roles),
         liveStatus: liveByUser.get(u.id) ?? 'OFFLINE',
       })),
       page: total !== null ? { ...page.page, total } : page.page,
@@ -241,7 +273,8 @@ export class UsersService {
 
   /** Flattens department/organization to {id, name} and swaps the raw storage key for a signed avatar URL. */
   private async shapeProfile(user: ProfileUser): Promise<Record<string, unknown>> {
-    const { avatarKey, department, organization, supervisor, ...rest } = user;
+    const { avatarKey, department, organization, supervisor, roles, ...rest } = user;
+    const sortedRoles = sortRolesByPrivilege(roles);
     let avatarUrl = null;
     if (avatarKey) {
       try {
@@ -270,6 +303,7 @@ export class UsersService {
     }
     return {
       ...rest,
+      roles: sortedRoles,
       department: department ? { id: department.id, name: department.name } : null,
       organization: { id: organization.id, name: organization.name },
       supervisor: supervisorShaped,
@@ -402,15 +436,14 @@ export class UsersService {
       ];
     }
 
-    let users = await this.prisma.user.findMany({
+    if (query.role) Object.assign(where, roleFilterWhere(query.role));
+
+    const users = await this.prisma.user.findMany({
       where,
       include: { roles: { include: { role: true } }, department: true },
       orderBy: { lastName: 'asc' },
       take: 2000,
     });
-    if (query.role) {
-      users = users.filter((u) => u.roles.some((ur) => ur.role.key === query.role));
-    }
 
     await this.audit(caller.tenantId, caller.userId, AuditAction.ADMIN_ACTION, 'employee_export', caller.userId);
 
@@ -450,15 +483,14 @@ export class UsersService {
       ];
     }
 
-    let users = await this.prisma.user.findMany({
+    if (query.role) Object.assign(where, roleFilterWhere(query.role));
+
+    const users = await this.prisma.user.findMany({
       where,
       include: { roles: { include: { role: true } }, department: true },
       orderBy: { lastName: 'asc' },
       take: 2000,
     });
-    if (query.role) {
-      users = users.filter((u) => u.roles.some((ur) => ur.role.key === query.role));
-    }
 
     await this.audit(caller.tenantId, caller.userId, AuditAction.ADMIN_ACTION, 'employee_export', caller.userId);
 
@@ -518,7 +550,16 @@ export class UsersService {
       if (!dept) throw new NotFoundException('Department not found in this organization');
     }
 
-    const { version, ...rest } = dto;
+    let normalizedEmail: string | undefined;
+    if (dto.email) {
+      normalizedEmail = dto.email.toLowerCase();
+      const existingEmail = await this.prisma.user.findFirst({
+        where: { tenantId: caller.tenantId, email: normalizedEmail, deletedAt: null, NOT: { id } },
+      });
+      if (existingEmail) throw new ConflictException('A user with this email already exists');
+    }
+
+    const { version, email: _rawEmail, ...rest } = dto;
 
     // Transferring an employee to a new department re-points their supervisor to
     // that department's head (null when it has none), unless the caller set
@@ -532,6 +573,7 @@ export class UsersService {
       where: { id },
       data: {
         ...rest,
+        ...(normalizedEmail ? { email: normalizedEmail } : {}),
         ...(supervisorOverride !== undefined ? { supervisorId: supervisorOverride } : {}),
         updatedBy: caller.userId,
         version: { increment: 1 },
@@ -607,18 +649,16 @@ export class UsersService {
       ];
     }
 
+    if (query.role) Object.assign(where, roleFilterWhere(query.role));
+
     const total = await this.prisma.user.count({ where });
 
-    let users = await this.prisma.user.findMany({
+    const users = await this.prisma.user.findMany({
       where: { ...where, ...cursorWhere },
       include: { roles: { include: { role: true } }, department: { select: { id: true, name: true } } },
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
     });
-
-    if (query.role) {
-      users = users.filter((u) => u.roles.some((ur) => ur.role.key === query.role));
-    }
 
     const page = buildPage(users, limit);
     return {

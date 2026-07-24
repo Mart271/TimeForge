@@ -1,5 +1,6 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuditAction, Prisma } from '@prisma/client';
+import { Role } from '@timeforge/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CacheService } from '../../infra/cache.service';
 import { buildPage, decodeCursor, ListQuery, PageResult } from '../../common/crud/crud.service';
@@ -115,9 +116,29 @@ export class DepartmentsService {
     if (!manager) throw new NotFoundException('Manager not found in this organization');
   }
 
+  /**
+   * Appends the SUPERVISOR role to a newly-assigned department head, so they
+   * immediately gain supervisor permissions on top of whatever role(s) they
+   * already have (RBAC unions permissions across all of a user's roles — see
+   * RbacService.resolvePermissions). Never removes their existing role(s).
+   */
+  private async grantSupervisorRole(tenantId: string, userId: string): Promise<void> {
+    const role = await this.prisma.role.findFirst({
+      where: { tenantId, key: Role.SUPERVISOR, deletedAt: null },
+      select: { id: true },
+    });
+    if (!role) return; // Tenant has no SUPERVISOR role defined — nothing to grant.
+    await this.prisma.userRole.upsert({
+      where: { userId_roleId: { userId, roleId: role.id } },
+      update: {},
+      create: { userId, roleId: role.id },
+    });
+  }
+
   async create(tenantId: string, orgId: string, actorId: string, dto: CreateDepartmentDto) {
     if (dto.managerId) await this.validateManager(tenantId, orgId, dto.managerId);
     const created = await this.createRow(tenantId, orgId, actorId, dto);
+    if (dto.managerId) await this.grantSupervisorRole(tenantId, dto.managerId);
     await this.audit(tenantId, actorId, AuditAction.ADMIN_ACTION, 'department', created.id, { event: 'DEPARTMENT_CREATED', name: created.name });
     await this.bustOrgDashboardCache(orgId);
     return shapeDepartment(created);
@@ -170,6 +191,12 @@ export class DepartmentsService {
         where: { tenantId: caller.tenantId, organizationId: caller.organizationId, departmentId: id, deletedAt: null },
         data: { supervisorId: dto.managerId ?? null, updatedBy: caller.userId },
       });
+      // The new head immediately gains the SUPERVISOR role. Intentionally not
+      // revoking it from the previous head on reassignment/removal — they may
+      // still head another department, or hold the role for an unrelated
+      // reason; auto-revoking risks incorrectly demoting them. Out of scope
+      // per BUG-B (no bulk backfill/reconciliation of existing assignments).
+      if (dto.managerId) await this.grantSupervisorRole(caller.tenantId, dto.managerId);
     }
 
     await this.audit(caller.tenantId, caller.userId, AuditAction.ADMIN_ACTION, 'department', id, { event: 'DEPARTMENT_UPDATED', ...rest });

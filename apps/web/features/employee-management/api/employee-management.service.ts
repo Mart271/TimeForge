@@ -65,6 +65,16 @@ export async function updateEmployee(id: string, payload: UpdateEmployeePayload)
   return data;
 }
 
+/**
+ * Replaces a user's role set (promote/demote). The backend deletes the
+ * existing UserRole rows and recreates them from `roles`, so this is a full
+ * replacement, not an append — passing ["EMPLOYEE"] demotes an elevated user.
+ * Requires the caller to hold `user:assign_role` (Admin).
+ */
+export async function assignRoles(userId: string, roles: string[]): Promise<void> {
+  await apiClient.post(`/users/${userId}/roles`, { roles });
+}
+
 export async function inviteEmployee(payload: CreateEmployeeInput): Promise<EmployeeRow> {
   const { data } = await apiClient.post<EmployeeRow>("/employees/invite", payload);
   return data;

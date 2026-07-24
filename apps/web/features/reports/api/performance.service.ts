@@ -74,6 +74,19 @@ export interface PerformanceQuery {
   granularity?: "weekly" | "monthly" | "quarterly" | "custom";
 }
 
+export interface SelectablePerformanceUser {
+  id: string;
+  name: string;
+  email: string;
+  jobTitle: string | null;
+  department: string | null;
+}
+
+export async function getSelectablePerformanceUsers(params: PerformanceQuery = {}): Promise<SelectablePerformanceUser[]> {
+  const { data } = await apiClient.get<SelectablePerformanceUser[]>("/performance/users", { params });
+  return data;
+}
+
 export async function getPerformanceDashboard(params: PerformanceQuery): Promise<PerformanceDashboardData> {
   const { data } = await apiClient.get<PerformanceDashboardData>("/performance/dashboard", { params });
   return data;

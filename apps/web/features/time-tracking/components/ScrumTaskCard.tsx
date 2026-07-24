@@ -137,6 +137,14 @@ export function ScrumTaskCard({ entry, loading, onToast }: ScrumTaskCardProps) {
     if (!editingTaskId && kpiSummary.length === 0) setUseCustomKpi(true);
   }, [kpiSummary, editingTaskId]);
 
+  // When a configured KPI is selected, pre-fill the planned target with the
+  // admin's master target as a suggestion — the employee can then change it.
+  useEffect(() => {
+    if (!useCustomKpi && selectedKpi && !editingTaskId) {
+      setTaskTarget(`${selectedKpi.target}${selectedKpi.unit ? ` ${selectedKpi.unit}` : ""}`);
+    }
+  }, [taskKpiTemplateId, selectedKpi, useCustomKpi, editingTaskId]);
+
   const { data: tasks = [] } = useQuery({
     queryKey: ["scrum-tasks", entry?.id],
     queryFn: () => listScrumTasks(entry!.id),
@@ -245,7 +253,7 @@ export function ScrumTaskCard({ entry, loading, onToast }: ScrumTaskCardProps) {
         measurement: taskCriteria,
         kpiTemplateId: !useCustomKpi && taskKpiTemplateId ? taskKpiTemplateId : undefined,
         kpi: useCustomKpi ? (taskKpi || undefined) : undefined,
-        plannedTarget: useCustomKpi ? (taskTarget || undefined) : undefined,
+        plannedTarget: taskTarget || undefined,
         projectId: taskProj || undefined,
       });
     },
@@ -268,7 +276,7 @@ export function ScrumTaskCard({ entry, loading, onToast }: ScrumTaskCardProps) {
         // link in place server-side.
         kpiTemplateId: !useCustomKpi && taskKpiTemplateId ? taskKpiTemplateId : useCustomKpi ? null : undefined,
         kpi: useCustomKpi ? (taskKpi || undefined) : undefined,
-        plannedTarget: useCustomKpi ? (taskTarget || undefined) : undefined,
+        plannedTarget: taskTarget || undefined,
         projectId: taskProj || undefined,
         version: task.version,
       }),
@@ -593,17 +601,35 @@ export function ScrumTaskCard({ entry, loading, onToast }: ScrumTaskCardProps) {
                   <span className="font-bold text-brand-navy block mb-0.5">Measurement Criteria:</span>
                   <p className="text-brand-ink">{item.measurement}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <div>
                     <span className="font-bold text-brand-navy block mb-0.5">KPI:</span>
                     <p className="text-brand-ink truncate">{item.kpi || "—"}</p>
                   </div>
                   <div>
-                    <span className="font-bold text-brand-navy block mb-0.5">Target:</span>
+                    <span className="font-bold text-brand-navy block mb-0.5">Planned Target:</span>
                     <p className="text-brand-ink truncate">{item.plannedTarget || "—"}</p>
+                  </div>
+                  <div>
+                    <span className="font-bold text-brand-navy block mb-0.5">Actual Completed:</span>
+                    <p className={cn("truncate", item.actualCompleted ? "text-brand-ink font-semibold" : "text-brand-muted italic")}>
+                      {item.actualCompleted || "Not yet reported"}
+                    </p>
                   </div>
                 </div>
               </div>
+
+              {/* Inline Actual Completed input — available on non-locked tasks */}
+              {!locked && item.kpi && (
+                <ActualCompletedInline
+                  task={item}
+                  onSaved={() => {
+                    invalidateEntry();
+                    onToast({ message: "Actual completed saved." });
+                  }}
+                  onError={(msg) => onToast({ message: msg, tone: "error" })}
+                />
+              )}
 
               <div className="flex items-center justify-between border-t border-[#c3c6d2]/20 pt-2 text-xs">
                 <span className="text-brand-muted">
@@ -756,11 +782,16 @@ export function ScrumTaskCard({ entry, loading, onToast }: ScrumTaskCardProps) {
                     <input
                       id="new-task-target"
                       type="text"
-                      readOnly
-                      value={selectedKpi ? `${selectedKpi.target}${selectedKpi.unit ? ` ${selectedKpi.unit}` : ""}` : ""}
-                      placeholder="Auto-filled from the selected KPI"
-                      className="h-11 w-full rounded-[10px] border border-[#c3c6d2] bg-[#f6f3f4] px-3 text-sm text-brand-muted"
+                      value={taskTarget}
+                      onChange={(e) => setTaskTarget(e.target.value)}
+                      placeholder={selectedKpi ? "Suggested — you can change" : "e.g. 5 deals, 10 hours"}
+                      className="h-11 w-full rounded-[10px] border border-[#c3c6d2] bg-white px-3 text-sm focus:outline-none focus:border-brand"
                     />
+                    {selectedKpi && (
+                      <p className="mt-1 text-[10px] text-brand-muted">
+                        Admin target: {selectedKpi.target}{selectedKpi.unit ? ` ${selectedKpi.unit}` : ""}
+                      </p>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -1051,6 +1082,75 @@ export function ScrumTaskCard({ entry, loading, onToast }: ScrumTaskCardProps) {
         </div>
         )}
       </form>
+    </div>
+  );
+}
+
+/** Compact inline input for reporting actual completed value on a KPI-linked task. */
+function ActualCompletedInline({
+  task,
+  onSaved,
+  onError,
+}: {
+  task: ScrumTask;
+  onSaved: () => void;
+  onError: (msg: string) => void;
+}) {
+  const [value, setValue] = useState(task.actualCompleted ?? "");
+  const [saving, setSaving] = useState(false);
+
+  // Keep in sync if the task refreshes from the server
+  useEffect(() => {
+    setValue(task.actualCompleted ?? "");
+  }, [task.actualCompleted]);
+
+  const isDirty = value !== (task.actualCompleted ?? "");
+
+  const handleSave = async () => {
+    if (!isDirty) return;
+    setSaving(true);
+    try {
+      await updateScrumTask(task.id, {
+        actualCompleted: value || undefined,
+        version: task.version,
+      });
+      onSaved();
+    } catch (err) {
+      onError(err instanceof ApiError ? err.message : "Could not save actual completed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 bg-[#f6f3f4]/40 rounded-[8px] px-3 py-2 border border-[#c3c6d2]/20">
+      <label htmlFor={`actual-${task.id}`} className="text-[10px] font-bold text-brand-navy whitespace-nowrap uppercase tracking-[0.5px]">
+        Actual Completed:
+      </label>
+      <input
+        id={`actual-${task.id}`}
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="e.g. 8, 10 hrs"
+        className="h-8 flex-1 min-w-0 rounded-[6px] border border-[#c3c6d2] bg-white px-2 text-xs focus:outline-none focus:border-brand"
+      />
+      {isDirty && (
+        <button
+          type="button"
+          disabled={saving}
+          onClick={handleSave}
+          className="flex h-7 items-center gap-1 rounded-[6px] bg-brand px-2.5 text-[10px] font-bold text-white hover:bg-[#1467d6] transition-colors disabled:opacity-60"
+        >
+          {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+          Save
+        </button>
+      )}
+      {task.plannedTarget && (
+        <span className="text-[10px] text-brand-muted whitespace-nowrap" title="Your planned target for this task">
+          / {task.plannedTarget}
+        </span>
+      )}
     </div>
   );
 }

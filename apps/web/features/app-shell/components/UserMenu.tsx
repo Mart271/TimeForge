@@ -56,9 +56,12 @@ export function UserMenu() {
   // read "online" rather than "offline", which only makes sense for roles
   // that do clock in.
   const isNonTrackedRole = user?.roles.some((r) => r === "HR" || r === "FINANCE" || r === "ADMIN" || r === "SUPERVISOR") ?? false;
-  // Daily Scrum / Timesheet / Request Leave are individual-contributor actions —
-  // only Employees see them here, regardless of what other permissions a role holds.
-  const isEmployee = user?.roles.includes("EMPLOYEE") ?? false;
+  // Daily Scrum / Timesheet / Request Leave are individual-contributor actions.
+  // A user can hold EMPLOYEE alongside an elevated role (e.g. a department
+  // head appended SUPERVISOR while keeping their base EMPLOYEE role) — once
+  // elevated, these quick actions no longer apply, so exclude the same
+  // elevated-role set used for presence tracking above.
+  const isEmployee = (user?.roles.includes("EMPLOYEE") ?? false) && !isNonTrackedRole;
 
   const { data: me } = useQuery({ queryKey: ["account", "me"], queryFn: getMe });
   const { data: notifCount } = useQuery({

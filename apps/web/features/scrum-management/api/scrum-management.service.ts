@@ -121,6 +121,7 @@ export interface ScrumEntryDetail {
     measurement: string;
     kpi: string | null;
     plannedTarget: string | null;
+    actualCompleted: string | null;
     project?: {
       name: string;
     } | null;
